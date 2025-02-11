@@ -16,45 +16,45 @@ export default function CrossedScene() {
       {/* 1) Y축 중심 회전, 보라색 띠 */}
       <RotatingArcOfStars
         radius={300}
-        pointsCount={1000}
+        pointsCount={500}
         axis={[0, 1, 0]}
         initialRotation={[0, 0, 0]}
         speed={0.3}
         color='#8e44ad'
-        size={0.7}
+        size={3}
       />
 
       {/* 2) X축 중심 회전, 파란색 띠 */}
       <RotatingArcOfStars
         radius={300}
-        pointsCount={1000}
+        pointsCount={500}
         axis={[1, 0, 0]}
         initialRotation={[Math.PI / 2, 0, 0]}
         speed={0.3}
         color='#8e44ad'
-        size={0.7}
+        size={3}
       />
 
       {/* 3) Z축 중심 회전, 노란색 띠 */}
       <RotatingArcOfStars
         radius={300}
-        pointsCount={1000}
+        pointsCount={500}
         axis={[1, 0, 1]}
         initialRotation={[0, Math.PI / 2, 0]}
         speed={0.3}
         color='#8e44ad'
-        size={0.7}
+        size={3}
       />
 
       {/* 4) 대각선 축, 빨간색 띠 */}
       <RotatingArcOfStars
         radius={300}
-        pointsCount={1000}
+        pointsCount={500}
         axis={[1, 1, 0]}
         initialRotation={[Math.PI / 3, Math.PI / 4, 0]}
         speed={0.3}
         color='#8e44ad'
-        size={0.7}
+        size={3}
       />
       {/* 별 배경 (drei의 Stars) */}
       <Stars
