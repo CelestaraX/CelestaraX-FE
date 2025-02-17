@@ -2,7 +2,8 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export const Header = () => {
   return (
-    <div className='absolute right-5 top-5'>
+    <div className='flex justify-between p-10'>
+      <h1 className='text-2xl font-bold'>My Galaxy</h1>
       <ConnectButton />
     </div>
   );
