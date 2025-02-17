@@ -136,39 +136,39 @@ export default function SolarSystem() {
       />
       <DebrisRing
         radius={400}
-        ringWidth={10}
+        ringWidth={30}
         axis={[0, 1, 0]} // 수직 축
         tilt={[1, 0, 1]} // 기울기 없음
         rotateSpeed={0.3}
         color='#ff00ff'
-        count={100000}
+        count={200000}
       />
       <DebrisRing
         radius={400}
-        ringWidth={10}
+        ringWidth={30}
         axis={[1, 0, 0]} // X축
         tilt={[Math.PI / 2, 0, 0]}
         rotateSpeed={0.3}
         color='#ff00ff'
-        count={100000}
+        count={200000}
       />
       <DebrisRing
         radius={400}
-        ringWidth={10}
+        ringWidth={30}
         axis={[1, 0, 1]} // 대각 축
         tilt={[0, Math.PI / 2, 0]}
         rotateSpeed={0.3}
         color='#ff00ff'
-        count={100000}
+        count={200000}
       />
       <DebrisRing
         radius={400}
-        ringWidth={10}
+        ringWidth={30}
         axis={[1, 1, 0]} // 또 다른 축
         tilt={[Math.PI / 3, Math.PI / 4, 0]}
         rotateSpeed={0.3}
         color='#ff00ff'
-        count={100000}
+        count={200000}
       />
 
       {/* 🌍 행성들 - 랜덤 초기 각도 적용 */}
