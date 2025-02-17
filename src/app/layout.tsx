@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import '@rainbow-me/rainbowkit/styles.css';
 import { Providers } from './providers';
-import { Header } from '@/components/layout/Header';
+import Header from '@/components/layout/Header';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,8 +31,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <Header />
-          {children}
+          <div className='flex h-screen flex-col'>
+            {/* 헤더 고정 */}
+            <Header />
+
+            {/* 메인 컨텐츠가 헤더 아래를 채우도록 설정 */}
+            <main className='flex-1 overflow-hidden'>{children}</main>
+          </div>
         </Providers>
       </body>
     </html>

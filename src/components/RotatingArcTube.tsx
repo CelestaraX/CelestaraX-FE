@@ -85,12 +85,22 @@ export default function RotatingArcTube({
   return (
     <group ref={groupRef}>
       <mesh geometry={geometry}>
-        <meshStandardMaterial
+        <meshPhysicalMaterial
           color={color}
           emissive={emissive}
           emissiveIntensity={emissiveIntensity}
-          metalness={0.2}
-          roughness={0.3}
+          // 반투명/투과 설정
+          transparent
+          opacity={0.8}
+          transmission={0.3} // 유리/젤리 느낌
+          thickness={2}
+          ior={1.2}
+          roughness={0.2}
+          metalness={0}
+          clearcoat={0.4}
+          clearcoatRoughness={0.1}
+          envMapIntensity={1.0}
+          // 그림자 수신/발생
         />
       </mesh>
     </group>
