@@ -1,31 +1,34 @@
 'use client';
-import GalaxyScene from '@/components/GalaxyScene';
-import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import React from 'react';
 
 export default function HomePage() {
-  const [focusPlanet, setFocusPlanet] = useState(false);
   const router = useRouter();
 
-  // SceneContent가 줌인 완료 시 호출하는 콜백
-  const handleZoomComplete = () => {
-    router.push('/other-page');
+  const handleClick = () => {
+    router.push('/dashboard');
   };
 
   return (
-    <div className='relative h-full w-full'>
-      {/* 상단 헤더 버튼 */}
-      <header className='absolute left-0 top-0 p-2'>
-        <button
-          onClick={() => setFocusPlanet(true)}
-          className='rounded-md bg-white px-4 py-2 text-black shadow-md'
-        >
-          행성 집중
-        </button>
-      </header>
+    <main className='relative flex h-screen flex-col items-center justify-center text-white'>
+      {/* 로고 + 문구 */}
+      <div className='text-center'>
+        <div className='glitch-effect text-7xl font-bold text-pink-500'>
+          WEB3ITE
+        </div>
+        <p className='mt-4 max-w-md text-center text-xl text-gray-300'>
+          The world’s first decentralized prover network. <br />
+          Welcome to Level 1: Crisis of Trust
+        </p>
 
-      {/* GalaxyScene */}
-      <GalaxyScene zooming={focusPlanet} onZoomComplete={handleZoomComplete} />
-    </div>
+        {/* 버튼 */}
+        <button
+          onClick={handleClick}
+          className='mt-10 transform bg-pink-500 px-8 py-3 text-lg font-bold tracking-wider text-white shadow-[0_0_10px_#ff00ff] transition-transform hover:scale-105 hover:bg-pink-400'
+        >
+          ENTER TESTNET
+        </button>
+      </div>
+    </main>
   );
 }

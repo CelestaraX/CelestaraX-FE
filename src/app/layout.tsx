@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import '@rainbow-me/rainbowkit/styles.css';
 import { Providers } from './providers';
-import Header from '@/components/layout/Header';
+import StarsSceneWrapper from '@/components/StarsSceneWrapper';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,12 +31,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <div className='flex h-screen flex-col'>
-            {/* 헤더 고정 */}
-            <Header />
-
-            {/* 메인 컨텐츠가 헤더 아래를 채우도록 설정 */}
-            <main className='flex-1 overflow-hidden'>{children}</main>
+          {/* ✅ StarsScene을 absolute로 설정하여 배경으로 만듦 */}
+          <div className='relative h-screen w-screen overflow-hidden'>
+            {/* ✅ StarsScene을 클라이언트에서만 실행 (SSR 문제 해결) */}
+            <StarsSceneWrapper className='fixed inset-0 -z-10' />
+            <main className='relative z-10 flex h-full flex-col'>
+              {children}
+            </main>
           </div>
         </Providers>
       </body>
