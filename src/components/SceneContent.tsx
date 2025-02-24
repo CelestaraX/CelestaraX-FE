@@ -11,14 +11,9 @@ function easeOutQuad(t: number) {
 interface SceneContentProps {
   zooming: boolean;
   onZoomComplete?: () => void;
-  onSelectPlanet: (planetId: string) => void;
 }
 
-export function SceneContent({
-  zooming,
-  onZoomComplete,
-  onSelectPlanet,
-}: SceneContentProps) {
+export function SceneContent({ zooming, onZoomComplete }: SceneContentProps) {
   const { camera } = useThree();
 
   const [progress, setProgress] = useState(0);
@@ -53,7 +48,7 @@ export function SceneContent({
 
   return (
     <>
-      <SolarSystem onSelectPlanet={onSelectPlanet} />
+      <SolarSystem />
     </>
   );
 }

@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import CustomStarsPlanet from './CustomStarsPlanet';
-// import { Stars } from '@react-three/drei';
 import DebrisRing from './DebrisRing';
 
 interface OrbitProps {
@@ -51,39 +50,33 @@ function OrbitRing({
     </mesh>
   );
 }
-
-interface PlanetProps {
+interface OrbitingPlanetProps {
   orbitRadius: number;
-  orbitSpeed: number; // 공전 속도
-  rotationSpeed: number; // 자전 속도
-  planetColor?: string;
+  orbitSpeed: number;
+  rotationSpeed: number;
   planetSize?: number;
-  initialAngle?: number; // 초기 각도 (0 ~ 2π)
-  count: number;
-  color?: string;
-  onSelect: (planetId: string) => void;
-  id: string;
+  geometries: number;
+  color: string;
 }
 
 /**
  * 행성이 태양 중심을 공전하면서, 자체 자전도 하는 컴포넌트
+ * 행성을 더욱 별처럼 보이게 하기 위한 추가적인 질감 및 효과 적용
+ * 내부에 먼지 입자가 행성 주변에서 소용돌이치도록 수정
  */
 function OrbitingPlanet({
   orbitRadius,
   orbitSpeed,
   rotationSpeed,
   planetSize = 10,
-  initialAngle = Math.random() * Math.PI * 2, // 🌟 랜덤한 초기 각도 적용
-  // count,
+  geometries,
   color,
-  onSelect,
-  id,
-}: PlanetProps) {
+}: OrbitingPlanetProps) {
   const orbitRef = useRef<THREE.Group>(null);
   const planetRef = useRef<THREE.Mesh>(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isSelected, setIsSelected] = useState(false);
-  const [currentSize, setCurrentSize] = useState(planetSize);
+  const particleRef = useRef<THREE.Points>(null);
+
+  const initialAngle = useMemo(() => Math.random() * Math.PI * 2, []);
 
   const initialPosition = useMemo(() => {
     return new THREE.Vector3(
@@ -91,61 +84,86 @@ function OrbitingPlanet({
       0,
       Math.sin(initialAngle) * orbitRadius,
     );
-  }, [initialAngle, orbitRadius]); // ✅ useMemo를 사용해 한 번만 계산됨
+  }, [initialAngle, orbitRadius]);
 
-  // ✅ 매 프레임마다 공전 & 자전
   useFrame((_, delta) => {
     if (orbitRef.current) {
       orbitRef.current.rotation.y += orbitSpeed * delta;
     }
     if (planetRef.current) {
-      planetRef.current.rotation.y += isSelected
-        ? rotationSpeed * 2 * delta
-        : rotationSpeed * delta;
+      planetRef.current.rotation.y += rotationSpeed * delta;
+    }
+    if (particleRef.current) {
+      const positions = particleRef.current.geometry.attributes.position.array;
+      const swirlFactor = delta * rotationSpeed * 0.5;
+      for (let i = 0; i < positions.length; i += 3) {
+        const angle = Math.atan2(
+          positions[i + 2] - initialPosition.z,
+          positions[i] - initialPosition.x,
+        );
+        const radius = Math.sqrt(
+          (positions[i] - initialPosition.x) ** 2 +
+            (positions[i + 2] - initialPosition.z) ** 2,
+        );
+        positions[i] =
+          initialPosition.x + Math.cos(angle + swirlFactor) * radius;
+        positions[i + 2] =
+          initialPosition.z + Math.sin(angle + swirlFactor) * radius;
+      }
+      particleRef.current.geometry.attributes.position.needsUpdate = true;
     }
   });
 
+  // 다양한 형상을 가진 행성들
+  const geometriesType = [
+    new THREE.SphereGeometry(planetSize, 64, 64),
+    new THREE.DodecahedronGeometry(planetSize),
+    new THREE.TetrahedronGeometry(planetSize),
+    new THREE.OctahedronGeometry(planetSize),
+    new THREE.IcosahedronGeometry(planetSize),
+    new THREE.TorusKnotGeometry(planetSize * 0.5, planetSize * 0.2, 128, 32),
+  ];
+
+  // 먼지 입자 생성
+  const particles = useMemo(() => {
+    const particleGeometry = new THREE.BufferGeometry();
+    const particleCount = 400;
+    const positions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * planetSize * 1.2;
+      positions[i * 3] = initialPosition.x + Math.cos(angle) * radius;
+      positions[i * 3 + 1] =
+        initialPosition.y + (Math.random() - 0.5) * planetSize * 2;
+      positions[i * 3 + 2] = initialPosition.z + Math.sin(angle) * radius;
+    }
+    particleGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(positions, 3),
+    );
+    return particleGeometry;
+  }, [planetSize, initialPosition]);
+
   return (
     <group ref={orbitRef}>
-      {/* 초기 위치를 (x, 0, z)로 설정 */}
       <mesh
         ref={planetRef}
-        position={initialPosition.toArray()} // ✅ 위치를 변경되지 않는 값으로 유지
-        scale={isHovered || isSelected ? 1.5 : 1} // ✅ useState 없이 크기 변경
-        onPointerEnter={() => {
-          setIsHovered(true);
-          setCurrentSize(planetSize * 1.3); // ✅ Hover 시 커지게 설정
-        }}
-        onPointerLeave={() => {
-          setIsHovered(false);
-          if (!isSelected) setCurrentSize(planetSize); // ✅ 선택되지 않았을 때 크기 원래대로
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsSelected(!isSelected);
-          setCurrentSize(isSelected ? planetSize : planetSize * 1.5); // ✅ 클릭 시 크기 변화
-          onSelect(id);
-        }}
+        position={initialPosition.toArray()}
+        geometry={geometriesType[geometries]}
       >
-        <sphereGeometry args={[currentSize, 32, 32]} />
         <meshStandardMaterial
-          color={isSelected ? '#ff00ff' : isHovered ? '#00ffff' : color}
-          emissive={isHovered || isSelected ? '#ff00ff' : '#111'}
-          emissiveIntensity={isHovered || isSelected ? 8 : 0.5} // ✅ 발광 효과 강화
-          metalness={isSelected ? 1 : 0.3} // ✅ 금속 느낌 추가 (더 반짝이게)
-          roughness={isSelected ? 0.1 : 0.6} // ✅ 반짝임 추가
+          color={color}
+          emissive={1}
+          emissiveIntensity={1}
+          metalness={0.2}
+          roughness={0.3}
+          transparent
+          opacity={0.5}
         />
-        {/* <Stars
-          radius={planetSize}
-          depth={10}
-          count={count}
-          factor={5}
-          saturation={0}
-          fade
-        /> */}
       </mesh>
-
-      {/* 궤도 링 */}
+      <points ref={particleRef} geometry={particles}>
+        <pointsMaterial color='#ffffff' size={0.5} transparent opacity={0.8} />
+      </points>
       <OrbitRing radius={orbitRadius} />
     </group>
   );
@@ -154,11 +172,7 @@ function OrbitingPlanet({
 /**
  * SolarSystem: 태양 + 4개 행성
  */
-export default function SolarSystem({
-  onSelectPlanet,
-}: {
-  onSelectPlanet: (planetId: string) => void;
-}) {
+export default function SolarSystem({}) {
   return (
     <group>
       <CustomStarsPlanet
@@ -207,47 +221,43 @@ export default function SolarSystem({
         color='#ff00ff'
         count={200000}
       />
-
       {/* 🌍 행성들 - 랜덤 초기 각도 적용 */}
+      {/* 다양한 모양의 행성들 (별처럼 보이도록 효과 추가) */}
       <OrbitingPlanet
-        id='A'
+        key={1}
         orbitRadius={800}
-        orbitSpeed={0.4}
-        rotationSpeed={1}
-        planetColor='#FFFFFF'
-        planetSize={30}
-        count={8000}
-        onSelect={onSelectPlanet}
+        orbitSpeed={0.4 - 1 * 0.05}
+        rotationSpeed={0.5 + Math.random() * 1.5}
+        planetSize={30 + Math.random() * 20}
+        geometries={1}
+        color='#ff00ff'
       />
       <OrbitingPlanet
-        id='B'
-        orbitRadius={900}
-        orbitSpeed={0.3}
-        rotationSpeed={0.7}
-        planetColor='#FFFFFF'
-        planetSize={50}
-        count={10000}
-        onSelect={onSelectPlanet}
+        key={2}
+        orbitRadius={800 + 1 * 150}
+        orbitSpeed={0.4 - 2 * 0.05}
+        rotationSpeed={0.5 + Math.random() * 1.5}
+        planetSize={30 + Math.random() * 20}
+        geometries={2}
+        color='#00ffff'
       />
       <OrbitingPlanet
-        id='C'
-        orbitRadius={1000}
-        orbitSpeed={0.25}
-        rotationSpeed={0.8}
-        planetColor='#FFFFFF'
-        planetSize={70}
-        count={15000}
-        onSelect={onSelectPlanet}
+        key={3}
+        orbitRadius={800 + 2 * 150}
+        orbitSpeed={0.4 - 3 * 0.05}
+        rotationSpeed={0.5 + Math.random() * 1.5}
+        planetSize={30 + Math.random() * 20}
+        geometries={3}
+        color='#ffcc00'
       />
       <OrbitingPlanet
-        id='D'
-        orbitRadius={1100}
-        orbitSpeed={0.2}
-        rotationSpeed={1.2}
-        planetColor='#FFFFFF'
-        planetSize={90}
-        count={30000}
-        onSelect={onSelectPlanet}
+        key={4}
+        orbitRadius={800 + 3 * 150}
+        orbitSpeed={0.4 - 4 * 0.05}
+        rotationSpeed={0.5 + Math.random() * 1.5}
+        planetSize={30 + Math.random() * 20}
+        geometries={5}
+        color='#ff4444'
       />
     </group>
   );
