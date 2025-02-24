@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Swiper as SwiperClass } from 'swiper/types';
 import { Navigation } from 'swiper/modules';
@@ -8,16 +8,27 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import { allHTMLFiles } from '@/mock/data';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ThumbsUp,
+  ThumbsDown,
+  Search,
+} from 'lucide-react';
 
 export default function HtmlCardSlider() {
-  const htmlFiles = Object.values(allHTMLFiles);
+  const htmlFiles = useMemo(() => Object.values(allHTMLFiles), []);
   const [swiperRef, setSwiperRef] = useState<SwiperClass | null>(null);
   const [likes, setLikes] = useState<{
     [key: string]: 'like' | 'dislike' | null;
   }>({});
   const [activeIndex, setActiveIndex] = useState(0);
   const [isClient, setIsClient] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredFiles = useMemo(() => {
+    return htmlFiles.filter((file) => file.id.includes(searchQuery));
+  }, [searchQuery, htmlFiles]);
 
   useEffect(() => {
     setIsClient(true);
@@ -43,8 +54,22 @@ export default function HtmlCardSlider() {
 
   return (
     <div className='flex h-full w-full flex-col items-center justify-center gap-10'>
+      {/* ✅ 검색 바 적용 */}
+      <div className='relative w-80'>
+        <Search
+          className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
+          size={18}
+        />
+        <input
+          type='text'
+          placeholder='Enter file ID to search...'
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className='w-full rounded-xl bg-[#1c1c1e] px-10 py-2 text-gray-300 placeholder-gray-500 outline-none focus:ring-2 focus:ring-gray-600'
+        />
+      </div>
+
       <div className='flex w-full max-w-[1200px] items-center justify-between px-4'>
-        {/* 왼쪽 네비게이션 버튼 */}
         <motion.button
           className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50 sm:p-4 md:p-5 lg:p-6'
           whileHover={{ scale: 1.2 }}
@@ -54,7 +79,6 @@ export default function HtmlCardSlider() {
           <ChevronLeft size={36} />
         </motion.button>
 
-        {/* 슬라이드 카드 컨테이너 */}
         <Swiper
           spaceBetween={10}
           slidesPerView={1}
@@ -62,9 +86,9 @@ export default function HtmlCardSlider() {
           onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
           pagination={false}
           modules={[Navigation]}
-          className='h-[500px] w-[350px] shadow-lg sm:h-[600px] sm:w-[450px] md:h-[700px] md:w-[550px] lg:h-[800px] lg:w-[700px] xl:h-[900px] xl:w-[800px]'
+          className='h-[500px] w-[350px] shadow-lg sm:h-[600px] sm:w-[450px] md:h-[700px] md:w-[550px] lg:h-[800px] lg:w-[700px] xl:h-[800px] xl:w-[800px]'
         >
-          {htmlFiles.map((file, index) => (
+          {filteredFiles.map((file, index) => (
             <SwiperSlide key={file.id}>
               <motion.div
                 className='flex h-full flex-col bg-white bg-opacity-[0.3] p-3 shadow-lg'
@@ -72,12 +96,9 @@ export default function HtmlCardSlider() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                {/* 카드 헤더 */}
                 <h2 className='mb-3 text-center text-lg font-bold text-black sm:text-xl md:text-2xl'>
                   {file.name}
                 </h2>
-
-                {/* ✅ iframe을 사용하여 안전하게 HTML 실행 */}
                 {activeIndex === index ? (
                   <iframe
                     srcDoc={file.htmlContent}
@@ -94,7 +115,6 @@ export default function HtmlCardSlider() {
           ))}
         </Swiper>
 
-        {/* 오른쪽 네비게이션 버튼 */}
         <motion.button
           className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50 sm:p-4 md:p-5 lg:p-6'
           whileHover={{ scale: 1.2 }}
@@ -105,16 +125,15 @@ export default function HtmlCardSlider() {
         </motion.button>
       </div>
 
-      {/* 좋아요 & 싫어요 버튼 */}
       <div className='flex items-center gap-3 sm:gap-5 md:gap-8 lg:gap-10'>
         <motion.button
           className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition sm:px-5 sm:py-3 ${
-            likes[htmlFiles[activeIndex]?.id] === 'like'
+            likes[filteredFiles[activeIndex]?.id] === 'like'
               ? 'bg-green-500'
               : 'bg-gray-700'
           }`}
           whileTap={{ scale: 0.9 }}
-          onClick={() => handleLike(htmlFiles[activeIndex]?.id)}
+          onClick={() => handleLike(filteredFiles[activeIndex]?.id)}
         >
           <ThumbsUp size={20} />
           <span className='sm:text-lg md:text-xl'>추천</span>
@@ -122,12 +141,12 @@ export default function HtmlCardSlider() {
 
         <motion.button
           className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition sm:px-5 sm:py-3 ${
-            likes[htmlFiles[activeIndex]?.id] === 'dislike'
+            likes[filteredFiles[activeIndex]?.id] === 'dislike'
               ? 'bg-red-500'
               : 'bg-gray-700'
           }`}
           whileTap={{ scale: 0.9 }}
-          onClick={() => handleDislike(htmlFiles[activeIndex]?.id)}
+          onClick={() => handleDislike(filteredFiles[activeIndex]?.id)}
         >
           <ThumbsDown size={20} />
           <span className='sm:text-lg md:text-xl'>비추천</span>

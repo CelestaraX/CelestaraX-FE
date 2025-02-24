@@ -52,7 +52,7 @@ export default function DashboardPage() {
           className='absolute left-[400px] top-[200px] min-h-[100px] w-[500px] -translate-x-1/2 transition-opacity duration-1000'
           style={{ opacity }}
         >
-          <TypingText text={longText} speed={20} />
+          <TypingText text={longText} speed={15} />
         </div>
         <div className='flex-1'>
           {/* 🌌 3D 장면 */}
