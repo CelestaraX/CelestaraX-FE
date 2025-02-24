@@ -7,11 +7,13 @@ import { SceneContent } from './SceneContent';
 interface GalaxySceneProps {
   zooming: boolean;
   onZoomComplete?: () => void;
+  onSelectPlanet: (planetId: string) => void;
 }
 
 export default function GalaxyScene({
   zooming,
   onZoomComplete,
+  onSelectPlanet,
 }: GalaxySceneProps) {
   return (
     <Canvas
@@ -22,7 +24,11 @@ export default function GalaxyScene({
     >
       <ambientLight intensity={3} />
       <OrbitControls />
-      <SceneContent zooming={zooming} onZoomComplete={onZoomComplete} />
+      <SceneContent
+        zooming={zooming}
+        onZoomComplete={onZoomComplete}
+        onSelectPlanet={onSelectPlanet}
+      />
     </Canvas>
   );
 }

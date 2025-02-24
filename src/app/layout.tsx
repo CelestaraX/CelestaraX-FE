@@ -28,16 +28,12 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} m-0 p-0 antialiased`}
       >
         <Providers>
-          {/* ✅ StarsScene을 absolute로 설정하여 배경으로 만듦 */}
-          <div className='relative h-screen w-screen overflow-hidden'>
-            {/* ✅ StarsScene을 클라이언트에서만 실행 (SSR 문제 해결) */}
+          <div className='flex min-h-screen flex-col'>
             <StarsSceneWrapper className='fixed inset-0 -z-10' />
-            <main className='relative z-10 flex h-full flex-col'>
-              {children}
-            </main>
+            <div>{children}</div>
           </div>
         </Providers>
       </body>

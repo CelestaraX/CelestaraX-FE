@@ -11,9 +11,14 @@ function easeOutQuad(t: number) {
 interface SceneContentProps {
   zooming: boolean;
   onZoomComplete?: () => void;
+  onSelectPlanet: (planetId: string) => void;
 }
 
-export function SceneContent({ zooming, onZoomComplete }: SceneContentProps) {
+export function SceneContent({
+  zooming,
+  onZoomComplete,
+  onSelectPlanet,
+}: SceneContentProps) {
   const { camera } = useThree();
 
   const [progress, setProgress] = useState(0);
@@ -48,8 +53,7 @@ export function SceneContent({ zooming, onZoomComplete }: SceneContentProps) {
 
   return (
     <>
-      {/* SolarSystem 안에 작은 행성 클릭 => 모달도 표시 가능 */}
-      <SolarSystem />
+      <SolarSystem onSelectPlanet={onSelectPlanet} />
     </>
   );
 }

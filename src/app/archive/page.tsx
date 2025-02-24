@@ -2,20 +2,15 @@
 
 import React from 'react';
 import Header from '@/components/layout/Header';
-import dynamic from 'next/dynamic';
+import HtmlCardSlider from './_components/HtmlCardSlider';
 
-// 클라이언트 전용 컴포넌트 (SSR 비활성화)
-const HTMLInfiniteGrid = dynamic(
-  () => import('./_components/HTMLInfiniteGrid'),
-  { ssr: false },
-);
-export default function MyPage() {
+export default function ArchivePage() {
   return (
-    <>
+    <div>
       <Header />
-      <div className='relative h-screen'>
-        <HTMLInfiniteGrid />
-      </div>
-    </>
+      <main className='flex h-[calc(100vh-100px)]'>
+        <HtmlCardSlider />
+      </main>
+    </div>
   );
 }

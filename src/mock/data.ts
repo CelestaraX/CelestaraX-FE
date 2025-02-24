@@ -7,68 +7,45 @@ export interface HTMLFile {
 
 export const allHTMLFiles: HTMLFile[] = [];
 
-// ✅ 유니크한 HTML 페이지 100개 생성
-for (let i = 1; i <= 100; i++) {
-  const page = Math.ceil(i / 10); // 10개씩 페이지 그룹
-  const bgColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`; // 랜덤 배경색
-  const textColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`; // 랜덤 텍스트 색상
-  const buttonColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
-  const fontFamily = i % 2 === 0 ? 'Arial, sans-serif' : 'Courier, monospace'; // 폰트 다르게
-
-  allHTMLFiles.push({
-    id: `${i}`,
-    name: `Dynamic Page ${i}`,
-    page: `${page}`,
-    htmlContent: `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <title>Dynamic Page ${i}</title>
-      <style>
-        body {
-          background-color: ${bgColor};
-          color: ${textColor};
-          font-family: ${fontFamily};
-          text-align: center;
-          padding: 2rem;
-        }
-        h1 {
-          font-size: ${16 + (i % 5) * 4}px;
-        }
-        .box {
-          border: 2px solid ${textColor};
-          padding: 1rem;
-          margin-top: 1rem;
-          background: rgba(255,255,255,0.2);
-        }
-        .btn {
-          background: ${buttonColor};
-          padding: 10px 20px;
-          color: white;
-          border: none;
-          cursor: pointer;
-          font-size: 1rem;
-        }
-        .btn:hover {
-          background: black;
-        }
-      </style>
-    </head>
-    <body>
-      <h1>Welcome to Page ${i}</h1>
-      <div class="box">
-        <p>This is dynamically generated page number ${i}.</p>
-        <button class="btn" onclick="pageAction${i}()">Click me</button>
-      </div>
-      <script>
-        function pageAction${i}() {
-          alert("You clicked on Page ${i}!");
-          console.log("User interacted with Page ${i}");
-        }
-      </script>
-    </body>
-    </html>
+allHTMLFiles.push({
+  id: `1`,
+  name: `worm game 1`,
+  page: `1`,
+  htmlContent: `
+    <!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"/><title>worm game</title><style>html,body{margin:0;padding:0;text-align:center;background:#f0f0f0;height:100%}#game{background:#000;display:block;margin:20px auto;border:2px solid #555;display:block}#gameover-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;font-family:sans-serif;font-size:24px;display:none}#overlay-content{background:#222;padding:20px 40px;border-radius:8px;text-align:center}#overlay-content button{margin-top:20px;padding:10px 20px;font-size:18px;cursor:pointer;border:none;border-radius:4px;background:#ff5555;color:#fff}</style></head><body><canvas id="game" width="400" height="400"></canvas><div id="gameover-overlay"><div id="overlay-content"><div id="gameover-text">Game Over!</div><div id="score-text">Score: <span id="final-score">0</span></div><button id="retry-btn">Retry</button></div></div><script>const canvas=document.getElementById("game");const ctx=canvas.getContext("2d");const gridSize=20;const tileCount=canvas.width/gridSize;const gameOverOverlay=document.getElementById("gameover-overlay");const finalScoreSpan=document.getElementById("final-score");const retryButton=document.getElementById("retry-btn");let snake,vx,vy,food,score,gameOver;function initGame(){snake=[{x:10,y:10}];vx=1;vy=0;score=0;food={x:15,y:15};gameOver=false;gameOverOverlay.style.display="none"}document.addEventListener("keydown",(e)=>{if(gameOver)return;switch(e.keyCode){case 37:if(vx!==1){vx=-1;vy=0}break;case 38:if(vy!==1){vx=0;vy=-1}break;case 39:if(vx!==-1){vx=1;vy=0}break;case 40:if(vy!==-1){vx=0;vy=1}break}});function gameLoop(){if(gameOver)return;const head={x:snake[0].x+vx,y:snake[0].y+vy};if(head.x<0||head.x>=tileCount||head.y<0||head.y>=tileCount){showGameOver();return}snake.unshift(head);for(let i=1;i<snake.length;i++){if(snake[i].x===head.x&&snake[i].y===head.y){showGameOver();return}}if(head.x===food.x&&head.y===food.y){score++;food.x=Math.floor(Math.random()*tileCount);food.y=Math.floor(Math.random()*tileCount)}else{snake.pop()}ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="lime";snake.forEach(part=>{ctx.fillRect(part.x*gridSize,part.y*gridSize,gridSize,gridSize)});ctx.fillStyle="red";ctx.fillRect(food.x*gridSize,food.y*gridSize,gridSize,gridSize)}function showGameOver(){gameOver=true;finalScoreSpan.textContent=score;gameOverOverlay.style.display="flex"}retryButton.addEventListener("click",()=>{initGame()});initGame();setInterval(gameLoop,100);</script></body></html>
     `,
-  });
-}
+});
+
+allHTMLFiles.push({
+  id: `2`,
+  name: `space adventure 2`,
+  page: `2`,
+  htmlContent: `
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Space Adventure</title><style>body{margin:0;padding:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;user-select:none}h1{margin-top:20px}#gameCanvas{background:#111;border:2px solid #fff;display:block;margin:10px auto 0 auto}#scoreBoard{margin:0 auto;text-align:center;margin-top:10px;margin-bottom:10px}#scoreBoard span{margin:0 20px}</style></head><body><h1>Space Adventure</h1><div id="scoreBoard"><span>Score: <span id="score">0</span></span><span>Health: <span id="health">5</span></span></div><canvas id="gameCanvas" width="600" height="400"></canvas><script>const canvas=document.getElementById("gameCanvas");const ctx=canvas.getContext("2d");const scoreSpan=document.getElementById("score");const healthSpan=document.getElementById("health");const WIDTH=canvas.width;const HEIGHT=canvas.height;let player={x:WIDTH/2,y:HEIGHT-60,size:20,speed:4};let score=0;let health=5;let gameOver=false;let stars=[];let asteroids=[];let keys={};function initObjects(){for(let i=0;i<10;i++){stars.push({x:Math.random()*(WIDTH-20)+10,y:Math.random()*(HEIGHT-100)+50,size:5});}for(let i=0;i<5;i++){asteroids.push({x:Math.random()*(WIDTH-30)+15,y:Math.random()*(HEIGHT/2),size:15,speed:1+Math.random()*2});}}document.addEventListener("keydown",(e)=>{keys[e.key]=true;});document.addEventListener("keyup",(e)=>{keys[e.key]=false;});function update(){if(gameOver)return;if(keys["ArrowLeft"]){player.x-=player.speed;}if(keys["ArrowRight"]){player.x+=player.speed;}if(keys["ArrowUp"]){player.y-=player.speed;}if(keys["ArrowDown"]){player.y+=player.speed;}if(player.x<0){player.x=0;}if(player.x>WIDTH-player.size){player.x=WIDTH-player.size;}if(player.y<0){player.y=0;}if(player.y>HEIGHT-player.size){player.y=HEIGHT-player.size;}for(let i=0;i<stars.length;i++){if(checkCollision(player.x,player.y,player.size,stars[i].x,stars[i].y,stars[i].size)){score++;scoreSpan.textContent=score;stars[i].x=Math.random()*(WIDTH-20)+10;stars[i].y=Math.random()*(HEIGHT-100)+50;}}for(let i=0;i<asteroids.length;i++){asteroids[i].y+=asteroids[i].speed;if(checkCollision(player.x,player.y,player.size,asteroids[i].x,asteroids[i].y,asteroids[i].size)){health--;healthSpan.textContent=health;asteroids[i].x=Math.random()*(WIDTH-30)+15;asteroids[i].y=-20;}if(asteroids[i].y>HEIGHT+20){asteroids[i].x=Math.random()*(WIDTH-30)+15;asteroids[i].y=-20;}}if(health<=0){gameOver=true;}}function checkCollision(x1,y1,size1,x2,y2,size2){let distX=x1-x2;let distY=y1-y2;let distance=Math.sqrt(distX*distX+distY*distY);return distance<(size1/2+size2/2);}function draw(){ctx.clearRect(0,0,WIDTH,HEIGHT);ctx.fillStyle="lime";ctx.beginPath();ctx.arc(player.x,player.y,player.size/2,0,Math.PI*2);ctx.fill();ctx.fillStyle="yellow";stars.forEach(star=>{ctx.beginPath();ctx.arc(star.x,star.y,star.size/2,0,Math.PI*2);ctx.fill();});ctx.fillStyle="grey";asteroids.forEach(ast=>{ctx.beginPath();ctx.arc(ast.x,ast.y,ast.size/2,0,Math.PI*2);ctx.fill();});if(gameOver){ctx.fillStyle="red";ctx.font="40px Arial";let gameOverText="GAME OVER";let gameOverMetrics=ctx.measureText(gameOverText);ctx.fillText(gameOverText,(WIDTH-gameOverMetrics.width)/2,HEIGHT/2);ctx.font="20px Arial";ctx.fillStyle="white";let restartText="Refresh (F5) to restart!";let restartMetrics=ctx.measureText(restartText);ctx.fillText(restartText,(WIDTH-restartMetrics.width)/2,(HEIGHT/2)+40);}}function gameLoop(){update();draw();requestAnimationFrame(gameLoop);}initObjects();gameLoop();</script></body></html>    `,
+});
+
+allHTMLFiles.push({
+  id: `3`,
+  name: `Flappy square 3`,
+  page: `3`,
+  htmlContent: `
+  <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Flappy Square</title><style>body{margin:0;padding:0;background:#222;color:#fff;overflow:hidden;font-family:sans-serif;text-align:center}h1{margin:20px 0}#game{background:#000;display:block;margin:0 auto;border:2px solid #fff}</style></head><body><h1>Flappy Square</h1><canvas id="game" width="400" height="600"></canvas><script>const c=document.getElementById("game"),x=c.getContext("2d"),W=c.width,H=c.height;let square={x:50,y:H/2,size:20,gravity:0.4,velocity:0,jump:-7},pipes=[],pipeGap=140,pipeWidth=50,pipeSpeed=2,score=0,gameOver=false;function spawnPipe(){let topH=Math.random()*(H/2)+50,p={x:W,y:0,w:pipeWidth,h:topH,passed:false},p2={x:W,y:topH+pipeGap,w:pipeWidth,h:H-topH-pipeGap,passed:false};pipes.push(p,p2)}function reset(){square.y=H/2;square.velocity=0;score=0;pipes=[];gameOver=false;spawnPipe()}document.addEventListener("keydown",e=>{if(e.key===" "||e.key==="ArrowUp"){if(!gameOver){square.velocity=square.jump}else{reset()}}});function update(){if(gameOver)return;square.velocity+=square.gravity;square.y+=square.velocity;if(square.y+square.size>H||square.y<0){gameOver=true}for(let i=0;i<pipes.length;i++){pipes[i].x-=pipeSpeed;if(!pipes[i].passed&&pipes[i].x+pipes[i].w<square.x){pipes[i].passed=true;score++}if(collide(square.x,square.y,square.size,square.size,pipes[i].x,pipes[i].y,pipes[i].w,pipes[i].h)){gameOver=true}}if(pipes.length>0&&pipes[pipes.length-1].x< W-200){spawnPipe()}if(pipes[0].x+pipes[0].w<0){pipes.splice(0,2)}}function collide(ax,ay,aw,ah,bx,by,bw,bh){return(ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by)}function draw(){x.clearRect(0,0,W,H);x.fillStyle="lime";x.fillRect(square.x,square.y,square.size,square.size);x.fillStyle="cyan";for(let i=0;i<pipes.length;i++){x.fillRect(pipes[i].x,pipes[i].y,pipes[i].w,pipes[i].h)}x.fillStyle="#fff";x.font="20px Arial";x.fillText("Score: "+score,10,30);if(gameOver){x.fillStyle="red";x.font="40px Arial";x.fillText("GAME OVER",W/2-110,H/2-20);x.font="20px Arial";x.fillStyle="white";x.fillText("Press Space to restart",W/2-110,H/2+10)}}function loop(){update();draw();requestAnimationFrame(loop)}spawnPipe();spawnPipe();loop();</script></body></html>
+`,
+});
+
+allHTMLFiles.push({
+  id: `4`,
+  name: `Breakout 4`,
+  page: `4`,
+  htmlContent: `
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Breakout</title><style>body{background:#000;color:#fff;margin:0;padding:0;font-family:sans-serif}#gameCanvas{display:block;margin:20px auto;background:#222}</style></head><body><canvas id="gameCanvas" width="480" height="320"></canvas><script>const c=document.getElementById("gameCanvas"),x=c.getContext("2d"),W=c.width,H=c.height;let ballX=W/2,ballY=H-30,ballR=8,dx=2,dy=-2,paddleH=10,paddleW=75,paddleX=(W-paddleW)/2,leftP=false,rightP=false,bricks=[],rowCount=3,colCount=5,brickW=75,brickH=20,brickPadding=10,brickTop=30,brickLeft=30,score=0,gameOver=false;for(let r=0;r<rowCount;r++){bricks[r]=[];for(let c2=0;c2<colCount;c2++){bricks[r][c2]={x:0,y:0,hit:false}}}document.addEventListener("keydown",e=>{if(e.key==="ArrowLeft"){leftP=true}if(e.key==="ArrowRight"){rightP=true}});document.addEventListener("keyup",e=>{if(e.key==="ArrowLeft"){leftP=false}if(e.key==="ArrowRight"){rightP=false}});function drawBricks(){for(let r=0;r<rowCount;r++){for(let c2=0;c2<colCount;c2++){if(!bricks[r][c2].hit){let bx=(c2*(brickW+brickPadding))+brickLeft,by=(r*(brickH+brickPadding))+brickTop;bricks[r][c2].x=bx;bricks[r][c2].y=by;x.fillStyle="#0f0";x.fillRect(bx,by,brickW,brickH)}}}}function collision(){for(let r=0;r<rowCount;r++){for(let c2=0;c2<colCount;c2++){let b=bricks[r][c2];if(!b.hit){if(ballX> b.x&&ballX<b.x+brickW&&ballY> b.y&&ballY<b.y+brickH){dy=-dy;b.hit=true;score++}}}}}function drawScore(){x.fillStyle="#fff";x.font="16px Arial";x.fillText("Score: "+score,8,20)}function drawBall(){x.beginPath();x.arc(ballX,ballY,ballR,0,Math.PI*2);x.fillStyle="#ff0";x.fill();x.closePath()}function drawPaddle(){x.fillStyle="#09f";x.fillRect(paddleX,H-paddleH,paddleW,paddleH)}function update(){if(gameOver)return;ballX+=dx;ballY+=dy;if(ballX+dx<ballR||ballX+dx>W-ballR){dx=-dx}if(ballY+dy<ballR){dy=-dy}else if(ballY+dy>H-ballR){if(ballX>=paddleX&&ballX<=paddleX+paddleW){dy=-dy}else{gameOver=true}}collision();if(leftP&&paddleX>0){paddleX-=5}if(rightP&&paddleX+paddleW<W){paddleX+=5}if(score===rowCount*colCount){gameOver=true}}function draw(){x.clearRect(0,0,W,H);drawBricks();drawBall();drawPaddle();drawScore();if(gameOver){x.fillStyle="#f00";x.font="40px Arial";x.fillText("GAME OVER",W/2-110,H/2);x.font="20px Arial";x.fillStyle="#fff";x.fillText("Press F5 to Restart",W/2-100,H/2+30)}}function loop(){update();draw();requestAnimationFrame(loop)}loop();</script></body></html>`,
+});
+
+allHTMLFiles.push({
+  id: `5`,
+  name: `Space Shooter 5`,
+  page: `5`,
+  htmlContent: `
+  <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Space Shooter</title><style>body{margin:0;padding:0;background:#000;color:#fff;font-family:sans-serif;text-align:center}h1{margin:10px 0}#scoreDisplay{margin:10px 0}#gameCanvas{background:#111;display:block;margin:0 auto;border:1px solid #fff}</style></head><body><h1>Space Shooter</h1><div id="scoreDisplay">Score: <span id="score">0</span></div><canvas id="gameCanvas" width="400" height="500"></canvas><script>const c=document.getElementById("gameCanvas");const x=c.getContext("2d");const scoreSpan=document.getElementById("score");let player={x:200,y:450,w:20,h:20,speed:5};let bullets=[];let enemies=[];let keys={};let score=0;let gameOver=false;function spawnEnemy(){enemies.push({x:Math.random()*(c.width-20),y:-20,w:20,h:20,speed:2+Math.random()*2})}setInterval(spawnEnemy,1000);document.addEventListener("keydown",e=>{keys[e.key]=true});document.addEventListener("keyup",e=>{keys[e.key]=false});function update(){if(gameOver)return;if(keys["ArrowLeft"]&&player.x>0){player.x-=player.speed}if(keys["ArrowRight"]&&player.x+player.w<c.width){player.x+=player.speed}if(keys[" "]){bullets.push({x:player.x+player.w/2-2,y:player.y-10,w:4,h:10,speed:8})}bullets.forEach((b,i)=>{b.y-=b.speed;if(b.y<0){bullets.splice(i,1)}});enemies.forEach((e,i)=>{e.y+=e.speed;if(e.y>c.height){gameOver=true}});bullets.forEach((b,i)=>{enemies.forEach((e,j)=>{if(b.x<e.x+e.w&&b.x+b.w>e.x&&b.y<e.y+e.h&&b.y+b.h>e.y){score++;scoreSpan.textContent=score;enemies.splice(j,1);bullets.splice(i,1)}})});}function draw(){x.clearRect(0,0,c.width,c.height);x.fillStyle="lime";x.fillRect(player.x,player.y,player.w,player.h);x.fillStyle="yellow";bullets.forEach(b=>{x.fillRect(b.x,b.y,b.w,b.h)});x.fillStyle="red";enemies.forEach(e=>{x.fillRect(e.x,e.y,e.w,e.h)});if(gameOver){x.fillStyle="red";x.font="30px Arial";x.fillText("GAME OVER",c.width/2-80,c.height/2);x.font="16px Arial";x.fillStyle="#fff";x.fillText("Refresh to restart",c.width/2-60,c.height/2+30)}}function loop(){update();draw();requestAnimationFrame(loop)}loop();</script></body></html>
+`,
+});

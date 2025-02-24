@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import CustomStarsPlanet from './CustomStarsPlanet';
-import { Stars } from '@react-three/drei';
+// import { Stars } from '@react-three/drei';
 import DebrisRing from './DebrisRing';
 
 interface OrbitProps {
@@ -60,6 +60,9 @@ interface PlanetProps {
   planetSize?: number;
   initialAngle?: number; // 초기 각도 (0 ~ 2π)
   count: number;
+  color?: string;
+  onSelect: (planetId: string) => void;
+  id: string;
 }
 
 /**
@@ -71,45 +74,75 @@ function OrbitingPlanet({
   rotationSpeed,
   planetSize = 10,
   initialAngle = Math.random() * Math.PI * 2, // 🌟 랜덤한 초기 각도 적용
-  count,
+  // count,
+  color,
+  onSelect,
+  id,
 }: PlanetProps) {
   const orbitRef = useRef<THREE.Group>(null);
   const planetRef = useRef<THREE.Mesh>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isSelected, setIsSelected] = useState(false);
+  const [currentSize, setCurrentSize] = useState(planetSize);
 
-  // 초기 시작 위치를 랜덤한 각도로 설정
-  const initialX = Math.cos(initialAngle) * orbitRadius;
-  const initialZ = Math.sin(initialAngle) * orbitRadius;
+  const initialPosition = useMemo(() => {
+    return new THREE.Vector3(
+      Math.cos(initialAngle) * orbitRadius,
+      0,
+      Math.sin(initialAngle) * orbitRadius,
+    );
+  }, [initialAngle, orbitRadius]); // ✅ useMemo를 사용해 한 번만 계산됨
 
-  // 매 프레임마다 공전 & 자전
-  useFrame((state, delta) => {
+  // ✅ 매 프레임마다 공전 & 자전
+  useFrame((_, delta) => {
     if (orbitRef.current) {
-      // 공전: Y축 중심으로 orbitSpeed
       orbitRef.current.rotation.y += orbitSpeed * delta;
     }
     if (planetRef.current) {
-      // 자전
-      planetRef.current.rotation.y += rotationSpeed * delta;
+      planetRef.current.rotation.y += isSelected
+        ? rotationSpeed * 2 * delta
+        : rotationSpeed * delta;
     }
   });
 
   return (
     <group ref={orbitRef}>
       {/* 초기 위치를 (x, 0, z)로 설정 */}
-      <mesh ref={planetRef} position={[initialX, 0, initialZ]}>
-        {/* <sphereGeometry args={[planetSize, 32, 32]} />
+      <mesh
+        ref={planetRef}
+        position={initialPosition.toArray()} // ✅ 위치를 변경되지 않는 값으로 유지
+        scale={isHovered || isSelected ? 1.5 : 1} // ✅ useState 없이 크기 변경
+        onPointerEnter={() => {
+          setIsHovered(true);
+          setCurrentSize(planetSize * 1.3); // ✅ Hover 시 커지게 설정
+        }}
+        onPointerLeave={() => {
+          setIsHovered(false);
+          if (!isSelected) setCurrentSize(planetSize); // ✅ 선택되지 않았을 때 크기 원래대로
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsSelected(!isSelected);
+          setCurrentSize(isSelected ? planetSize : planetSize * 1.5); // ✅ 클릭 시 크기 변화
+          onSelect(id);
+        }}
+      >
+        <sphereGeometry args={[currentSize, 32, 32]} />
         <meshStandardMaterial
-          color={planetColor}
-          roughness={0.4}
-          metalness={0}
-        /> */}
-        <Stars
+          color={isSelected ? '#ff00ff' : isHovered ? '#00ffff' : color}
+          emissive={isHovered || isSelected ? '#ff00ff' : '#111'}
+          emissiveIntensity={isHovered || isSelected ? 8 : 0.5} // ✅ 발광 효과 강화
+          metalness={isSelected ? 1 : 0.3} // ✅ 금속 느낌 추가 (더 반짝이게)
+          roughness={isSelected ? 0.1 : 0.6} // ✅ 반짝임 추가
+        />
+        {/* <Stars
           radius={planetSize}
           depth={10}
           count={count}
           factor={5}
           saturation={0}
           fade
-        />
+        /> */}
       </mesh>
 
       {/* 궤도 링 */}
@@ -121,7 +154,11 @@ function OrbitingPlanet({
 /**
  * SolarSystem: 태양 + 4개 행성
  */
-export default function SolarSystem() {
+export default function SolarSystem({
+  onSelectPlanet,
+}: {
+  onSelectPlanet: (planetId: string) => void;
+}) {
   return (
     <group>
       <CustomStarsPlanet
@@ -173,36 +210,44 @@ export default function SolarSystem() {
 
       {/* 🌍 행성들 - 랜덤 초기 각도 적용 */}
       <OrbitingPlanet
+        id='A'
         orbitRadius={800}
         orbitSpeed={0.4}
         rotationSpeed={1}
         planetColor='#FFFFFF'
-        planetSize={3}
+        planetSize={30}
         count={8000}
+        onSelect={onSelectPlanet}
       />
       <OrbitingPlanet
+        id='B'
         orbitRadius={900}
         orbitSpeed={0.3}
         rotationSpeed={0.7}
         planetColor='#FFFFFF'
-        planetSize={5}
+        planetSize={50}
         count={10000}
+        onSelect={onSelectPlanet}
       />
       <OrbitingPlanet
+        id='C'
         orbitRadius={1000}
         orbitSpeed={0.25}
         rotationSpeed={0.8}
         planetColor='#FFFFFF'
-        planetSize={7}
+        planetSize={70}
         count={15000}
+        onSelect={onSelectPlanet}
       />
       <OrbitingPlanet
+        id='D'
         orbitRadius={1100}
         orbitSpeed={0.2}
         rotationSpeed={1.2}
         planetColor='#FFFFFF'
-        planetSize={9}
+        planetSize={90}
         count={30000}
+        onSelect={onSelectPlanet}
       />
     </group>
   );
