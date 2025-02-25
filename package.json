@@ -23,7 +23,6 @@
     "react-dom": "^19.0.0",
     "simplex-noise": "^4.0.3",
     "swiper": "^11.2.4",
-    "tailwind-variants": "^0.3.1",
     "three": "^0.173.0",
     "viem": "^2.22.21",
     "wagmi": "^2.14.9",
