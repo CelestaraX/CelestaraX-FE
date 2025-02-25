@@ -20,13 +20,13 @@ allowing users to deploy and interact with them.<br/>
 <span style="color: #ffcc00;">3. planet C</span><br/>  <!-- Yellow -->
 <span style="color: #ff4444;">4. planet D</span>`;
 
-export default function DashboardPage() {
+export default function UniversePage() {
   const router = useRouter();
   const [focusPlanet, setFocusPlanet] = useState(false);
   const [opacity, setOpacity] = useState(1);
 
   const handleZoomComplete = () => {
-    router.push('/archive');
+    router.push('/explorer');
   };
 
   const handleDeployClick = () => {

@@ -23,9 +23,9 @@ export default function Header({ onDeployClick }: HeaderProps) {
 
       {/* 네비게이션 */}
       <nav className='flex items-center space-x-6 font-mono text-lg'>
-        {/* Dashboard: 그냥 Link or some route */}
-        <Link href='/dashboard' className='text-[#00ffff] hover:text-white'>
-          [DASHBOARD]
+        {/* UNIVERSE: 그냥 Link or some route */}
+        <Link href='/universe' className='text-[#00ffff] hover:text-white'>
+          [UNIVERSE]
         </Link>
 
         {/* Deploy => 여기서 그냥 Link하면 즉시 이동 -> 
@@ -37,11 +37,11 @@ export default function Header({ onDeployClick }: HeaderProps) {
             if (onDeployClick) {
               onDeployClick?.();
             } else {
-              router.push('/archive');
+              router.push('/explorer');
             }
           }}
         >
-          [ARCHIVE]
+          [EXPLORER]
         </button>
 
         {/* About */}

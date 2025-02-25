@@ -6,7 +6,7 @@ export default function HomePage() {
   const router = useRouter();
 
   const handleClick = () => {
-    router.push('/dashboard');
+    router.push('/universe');
   };
 
   return (
