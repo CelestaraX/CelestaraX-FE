@@ -263,7 +263,7 @@ export default function DeployPage() {
                     />
                     <label
                       htmlFor={field}
-                      className='flex cursor-pointer items-center justify-center rounded-xl bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800'
+                      className='flex w-[300px] cursor-pointer items-center justify-center rounded-xl bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800'
                     >
                       <Upload size={18} className='mr-2' />
                       {formData[field] instanceof File
