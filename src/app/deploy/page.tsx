@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import Header from '@/components/layout/Header';
 import { X, Upload } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
@@ -13,8 +14,20 @@ const CircularProgress = ({ progress }: { progress: number }) => {
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (progress / 100) * circumference;
 
+  const strokeColor = progress === 100 ? 'limegreen' : 'orange';
+
   return (
     <svg className='absolute left-0 top-0 h-full w-full' viewBox='0 0 200 200'>
+      <defs>
+        <filter id='glow'>
+          <feGaussianBlur stdDeviation='4.5' result='coloredBlur' />
+          <feMerge>
+            <feMergeNode in='coloredBlur' />
+            <feMergeNode in='SourceGraphic' />
+          </feMerge>
+        </filter>
+      </defs>
+
       <circle
         cx='100'
         cy='100'
@@ -27,13 +40,14 @@ const CircularProgress = ({ progress }: { progress: number }) => {
         cx='100'
         cy='100'
         r={radius}
-        stroke='orange'
+        stroke={strokeColor}
         strokeWidth={strokeWidth}
         fill='none'
         strokeDasharray={circumference}
         strokeDashoffset={offset}
         strokeLinecap='round'
         className='transition-all duration-500'
+        filter={progress === 100 ? 'url(#glow)' : 'none'}
       />
     </svg>
   );
@@ -50,6 +64,7 @@ interface FormData {
 
 export default function DeployPage() {
   const { isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal(); // ★ RainbowKit useConnectModal
   const [formData, setFormData] = useState<FormData>({
     name: '',
     thumbnail: null,
@@ -58,8 +73,33 @@ export default function DeployPage() {
     immutable: '',
     fee: '',
   });
-
   const [progress, setProgress] = useState<number>(0);
+  const [isOpen, setIsOpen] = useState<{ [key in keyof FormData]?: boolean }>(
+    {},
+  );
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleDropdownToggle = (field: keyof FormData) => {
+    setIsOpen((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  // 🔹 외부 클릭 감지하는 useEffect 추가
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen({}); // 모든 드롭다운 닫기
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const validProgress = isNaN(progress) ? 0 : progress;
 
   const calculateProgress = (updatedForm: FormData) => {
@@ -67,7 +107,6 @@ export default function DeployPage() {
       setProgress(0);
       return;
     }
-
     const completedFields = Object.values(updatedForm).reduce(
       (count, value) => {
         if (typeof value === 'string' && value.trim() !== '') return count + 1;
@@ -76,7 +115,6 @@ export default function DeployPage() {
       },
       0,
     );
-
     const newProgress = Math.max(0, Math.min(100, (completedFields / 6) * 100));
     setProgress(newProgress);
   };
@@ -90,17 +128,21 @@ export default function DeployPage() {
     calculateProgress(updatedForm);
   };
 
+  // ★ Deploy 버튼 로직
   const handleDeploy = () => {
     if (!isConnected) {
-      alert('You must connect your wallet.');
+      // 지갑이 연결 안 됐다면 RainbowKit 모달 열기
+      if (openConnectModal) {
+        openConnectModal();
+      } else {
+        alert('지갑 연결을 위한 모달을 열 수 없습니다.');
+      }
       return;
     }
-
     if (progress < 100) {
       alert('Please fill in all the fields before deploying.');
       return;
     }
-
     alert('Deployment successful!');
   };
 
@@ -115,7 +157,6 @@ export default function DeployPage() {
             </h1>
             <div>Deploy your own page to Celestia.</div>
           </div>
-          {/* ✅ Left - Input Form */}
           <div className='flex flex-col gap-7'>
             {(['name', 'fee'] as Array<keyof FormData>).map((field) => (
               <div key={field} className='relative flex flex-col gap-2'>
@@ -128,7 +169,7 @@ export default function DeployPage() {
                   className='w-full rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none transition-all duration-200 focus:ring-2 focus:ring-gray-600'
                   value={
                     formData[field] instanceof File
-                      ? formData[field].name
+                      ? formData[field]?.name
                       : formData[field] || ''
                   }
                   onChange={(e) => handleInputChange(field, e.target.value)}
@@ -136,32 +177,70 @@ export default function DeployPage() {
               </div>
             ))}
 
-            {/* ✅ Select Boxes */}
             {(['ownership', 'immutable'] as Array<keyof FormData>).map(
-              (field) => (
-                <div key={field} className='relative flex flex-col gap-2'>
-                  <label className='text-sm text-cyan-300'>
-                    {field.charAt(0).toUpperCase() + field.slice(1)}
-                  </label>
-                  <select
-                    className='w-full rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none transition-all duration-200 focus:ring-2 focus:ring-gray-600'
-                    value={
-                      formData[field] instanceof File
-                        ? formData[field].name
-                        : formData[field] || ''
-                    }
-                    onChange={(e) => handleInputChange(field, e.target.value)}
-                  >
-                    <option value=''>Select {field}</option>
-                    <option value='Single'>Single</option>
-                    <option value='MultiSig'>MultiSig</option>
-                    <option value='Permissionless'>Permissionless</option>
-                  </select>
-                </div>
-              ),
+              (field) => {
+                const options =
+                  field === 'ownership'
+                    ? ['Single', 'MultiSig', 'Permissionless']
+                    : ['True', 'False'];
+
+                return (
+                  <div key={field} className='relative flex flex-col gap-2'>
+                    <label className='text-sm text-cyan-300'>
+                      {field.charAt(0).toUpperCase() + field.slice(1)}
+                    </label>
+                    <div className='relative'>
+                      <div
+                        className='w-full cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300 outline-none transition-all duration-200 focus:ring-2 focus:ring-gray-600'
+                        onClick={() => handleDropdownToggle(field)}
+                      >
+                        {formData[field] instanceof File
+                          ? (formData[field] as File).name
+                          : formData[field] || `Select ${field}`}
+                      </div>
+                      <div
+                        className={`absolute right-4 top-1/2 -translate-y-1/2 transition-transform duration-200 ${
+                          isOpen[field] ? 'rotate-180' : ''
+                        } pointer-events-none`}
+                      >
+                        <svg
+                          xmlns='http://www.w3.org/2000/svg'
+                          className='h-4 w-4 text-gray-400'
+                          viewBox='0 0 20 20'
+                          fill='currentColor'
+                        >
+                          <path
+                            fillRule='evenodd'
+                            d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'
+                            clipRule='evenodd'
+                          />
+                        </svg>
+                      </div>
+                      {isOpen[field] && (
+                        <div className='absolute left-0 top-full z-10 mt-2 w-full rounded-xl border border-gray-700 bg-[#1c1c1e] shadow-lg'>
+                          {options.map((option) => (
+                            <div
+                              key={option}
+                              className='cursor-pointer px-4 py-2 text-gray-300 hover:bg-gray-700'
+                              onClick={() => {
+                                handleInputChange(field, option);
+                                setTimeout(
+                                  () => handleDropdownToggle(field),
+                                  100,
+                                );
+                              }}
+                            >
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              },
             )}
 
-            {/* ✅ File Upload */}
             {(['thumbnail', 'htmlFile'] as Array<keyof FormData>).map(
               (field) => (
                 <div key={field} className='relative flex flex-col gap-2'>
@@ -203,21 +282,15 @@ export default function DeployPage() {
               ),
             )}
 
-            {/* ✅ Deploy Button */}
             <button
-              className={`w-full rounded-md px-6 py-3 text-lg font-semibold ${
-                isConnected
-                  ? 'bg-blue-500 hover:bg-blue-600'
-                  : 'cursor-not-allowed bg-gray-500'
-              }`}
+              className='w-full rounded-md bg-blue-500 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-600 disabled:bg-gray-500'
               onClick={handleDeploy}
-              disabled={!isConnected}
             >
-              {isConnected ? 'Deploy' : 'Connect Wallet First'}
+              Deploy
             </button>
           </div>
         </div>
-        {/* ✅ Right - Planet + Progress Bar */}
+
         <div className='relative flex w-full items-center justify-center md:w-1/2'>
           <div className='relative h-[500px] w-[500px]'>
             <CircularProgress progress={progress} />
