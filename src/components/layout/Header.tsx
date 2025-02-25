@@ -54,8 +54,8 @@ export default function Header({ onDeployClick }: HeaderProps) {
           [DEPLOY]
         </Link>
 
-        <Link href='/mypage' className={getNavItemClass('/mypage')}>
-          [MYPAGE]
+        <Link href='/dashboard' className={getNavItemClass('/dashboard')}>
+          [DASHBOARD]
         </Link>
 
         <div className='group relative'>
