@@ -49,12 +49,12 @@ export default function HtmlCardSlider() {
   };
 
   if (!isClient) {
-    return <div className='text-white'>로딩 중...</div>;
+    return <div className='text-white'>Loading...</div>;
   }
 
   return (
     <div className='flex h-full w-full flex-col items-center justify-center gap-10'>
-      {/* ✅ 검색 바 적용 */}
+      {/* ✅ Search Bar */}
       <div className='relative w-80'>
         <Search
           className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
@@ -62,7 +62,7 @@ export default function HtmlCardSlider() {
         />
         <input
           type='text'
-          placeholder='Enter file ID to search...'
+          placeholder='Search by file ID...'
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className='w-full rounded-xl bg-[#1c1c1e] px-10 py-2 text-gray-300 placeholder-gray-500 outline-none focus:ring-2 focus:ring-gray-600'
@@ -107,7 +107,7 @@ export default function HtmlCardSlider() {
                   />
                 ) : (
                   <div className='flex h-full w-full items-center justify-center text-gray-500'>
-                    HTML 렌더링 중...
+                    Rendering HTML...
                   </div>
                 )}
               </motion.div>
@@ -136,7 +136,7 @@ export default function HtmlCardSlider() {
           onClick={() => handleLike(filteredFiles[activeIndex]?.id)}
         >
           <ThumbsUp size={20} />
-          <span className='sm:text-lg md:text-xl'>추천</span>
+          <span className='sm:text-lg md:text-xl'>Like</span>
         </motion.button>
 
         <motion.button
@@ -149,7 +149,7 @@ export default function HtmlCardSlider() {
           onClick={() => handleDislike(filteredFiles[activeIndex]?.id)}
         >
           <ThumbsDown size={20} />
-          <span className='sm:text-lg md:text-xl'>비추천</span>
+          <span className='sm:text-lg md:text-xl'>Dislike</span>
         </motion.button>
       </div>
     </div>
