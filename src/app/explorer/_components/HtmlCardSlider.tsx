@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@apollo/client';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Swiper as SwiperClass } from 'swiper/types';
 import { Navigation } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
-import { allHTMLFiles } from '@/mock/data';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft,
@@ -16,24 +16,44 @@ import {
   Search,
 } from 'lucide-react';
 
+import { GET_PAGE_CREATEDS } from '@/lib/graphql/queries';
+import { PageCreated } from '@/types';
+import { fetchPageDataFromContract } from '@/lib/blockchain'; // 🔹 블록체인 데이터 가져오기
+
 export default function HtmlCardSlider() {
-  const htmlFiles = useMemo(() => Object.values(allHTMLFiles), []);
+  const { data, loading, error } = useQuery<{ pageCreateds: PageCreated[] }>(
+    GET_PAGE_CREATEDS,
+  );
   const [swiperRef, setSwiperRef] = useState<SwiperClass | null>(null);
   const [likes, setLikes] = useState<{
     [key: string]: 'like' | 'dislike' | null;
   }>({});
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isClient, setIsClient] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [rpcData, setRpcData] = useState<string | undefined>(
+    '<p>Loading blockchain data...</p>',
+  );
 
-  const filteredFiles = useMemo(() => {
-    return htmlFiles.filter((file) => file.id.includes(searchQuery));
-  }, [searchQuery, htmlFiles]);
+  const allPages = useMemo(() => data?.pageCreateds || [], [data]);
 
+  // 🔹 검색 기능
+  const filteredPages = useMemo(() => {
+    return allPages.filter((page) =>
+      page.pageId.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }, [searchQuery, allPages]);
+
+  // ✅ `pageId`를 이용해 블록체인 데이터 가져오기
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (filteredPages.length > 0) {
+      const currentPageId = filteredPages[activeIndex]?.pageId;
+      if (currentPageId) {
+        fetchPageDataFromContract(currentPageId).then(setRpcData);
+      }
+    }
+  }, [activeIndex, filteredPages]);
 
+  // 🔹 좋아요 / 싫어요 핸들러
   const handleLike = (id: string) => {
     setLikes((prev) => ({
       ...prev,
@@ -48,13 +68,13 @@ export default function HtmlCardSlider() {
     }));
   };
 
-  if (!isClient) {
-    return <div className='text-white'>Loading...</div>;
-  }
+  if (loading)
+    return <div className='text-white'>Loading from subgraph...</div>;
+  if (error) return <div className='text-white'>Error: {error.message}</div>;
 
   return (
     <div className='flex h-full w-full flex-col items-center justify-center gap-10'>
-      {/* ✅ Search Bar */}
+      {/* ✅ 검색창 */}
       <div className='relative w-80'>
         <Search
           className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
@@ -62,16 +82,17 @@ export default function HtmlCardSlider() {
         />
         <input
           type='text'
-          placeholder='Search by file ID...'
+          placeholder='Search by pageId...'
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className='w-full rounded-xl bg-[#1c1c1e] px-10 py-2 text-gray-300 placeholder-gray-500 outline-none focus:ring-2 focus:ring-gray-600'
         />
       </div>
 
+      {/* ✅ Swiper */}
       <div className='flex w-full max-w-[1200px] items-center justify-between px-4'>
         <motion.button
-          className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50 sm:p-4 md:p-5 lg:p-6'
+          className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50'
           whileHover={{ scale: 1.2 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => swiperRef?.slidePrev()}
@@ -84,30 +105,31 @@ export default function HtmlCardSlider() {
           slidesPerView={1}
           onSwiper={(swiper) => setSwiperRef(swiper)}
           onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
-          pagination={false}
           modules={[Navigation]}
-          className='h-[500px] w-[350px] shadow-lg sm:h-[600px] sm:w-[450px] md:h-[700px] md:w-[550px] lg:h-[800px] lg:w-[700px] xl:h-[800px] xl:w-[800px]'
+          className='h-[700px] w-[600px] shadow-lg'
         >
-          {filteredFiles.map((file, index) => (
-            <SwiperSlide key={file.id}>
+          {filteredPages.map((page, index) => (
+            <SwiperSlide key={page.id}>
               <motion.div
                 className='flex h-full flex-col bg-white bg-opacity-[0.3] p-3 shadow-lg'
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                <h2 className='mb-3 text-center text-lg font-bold text-black sm:text-xl md:text-2xl'>
-                  {file.name}
+                <h2 className='mb-3 text-center text-lg font-bold text-black'>
+                  PageId: {page.pageId}
                 </h2>
+
+                {/* ✅ 블록체인에서 가져온 HTML 렌더링 */}
                 {activeIndex === index ? (
                   <iframe
-                    srcDoc={file.htmlContent}
-                    className='h-full w-full border-none'
-                    sandbox='allow-scripts allow-same-origin allow-modals'
+                    srcDoc={rpcData}
+                    className='h-full w-full flex-1 border-none bg-gray-100'
+                    sandbox='allow-scripts allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox'
                   />
                 ) : (
-                  <div className='flex h-full w-full items-center justify-center text-gray-500'>
-                    Rendering HTML...
+                  <div className='flex flex-1 items-center justify-center text-gray-500'>
+                    Rendering data...
                   </div>
                 )}
               </motion.div>
@@ -116,7 +138,7 @@ export default function HtmlCardSlider() {
         </Swiper>
 
         <motion.button
-          className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50 sm:p-4 md:p-5 lg:p-6'
+          className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50'
           whileHover={{ scale: 1.2 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => swiperRef?.slideNext()}
@@ -125,33 +147,36 @@ export default function HtmlCardSlider() {
         </motion.button>
       </div>
 
-      <div className='flex items-center gap-3 sm:gap-5 md:gap-8 lg:gap-10'>
-        <motion.button
-          className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition sm:px-5 sm:py-3 ${
-            likes[filteredFiles[activeIndex]?.id] === 'like'
-              ? 'bg-green-500'
-              : 'bg-gray-700'
-          }`}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => handleLike(filteredFiles[activeIndex]?.id)}
-        >
-          <ThumbsUp size={20} />
-          <span className='sm:text-lg md:text-xl'>Like</span>
-        </motion.button>
+      {/* ✅ 따봉 (좋아요 & 싫어요) */}
+      {filteredPages.length > 0 && (
+        <div className='flex items-center gap-5'>
+          <motion.button
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition ${
+              likes[filteredPages[activeIndex]?.id] === 'like'
+                ? 'bg-green-500'
+                : 'bg-gray-700'
+            }`}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => handleLike(filteredPages[activeIndex]?.id)}
+          >
+            <ThumbsUp size={20} />
+            <span>Like</span>
+          </motion.button>
 
-        <motion.button
-          className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition sm:px-5 sm:py-3 ${
-            likes[filteredFiles[activeIndex]?.id] === 'dislike'
-              ? 'bg-red-500'
-              : 'bg-gray-700'
-          }`}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => handleDislike(filteredFiles[activeIndex]?.id)}
-        >
-          <ThumbsDown size={20} />
-          <span className='sm:text-lg md:text-xl'>Dislike</span>
-        </motion.button>
-      </div>
+          <motion.button
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition ${
+              likes[filteredPages[activeIndex]?.id] === 'dislike'
+                ? 'bg-red-500'
+                : 'bg-gray-700'
+            }`}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => handleDislike(filteredPages[activeIndex]?.id)}
+          >
+            <ThumbsDown size={20} />
+            <span>Dislike</span>
+          </motion.button>
+        </div>
+      )}
     </div>
   );
 }
