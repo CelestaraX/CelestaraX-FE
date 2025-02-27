@@ -1,10 +1,14 @@
+<p align="center">
+<img src="public/celestarax.jpg" alt="Logo" width="250" height="100">
+</p>
+
 # CelestaraX: The Eternal On-Chain Page Hub
 
 **CelestaraX** is a next-generation platform for fully on-chain HTML pages, built on the **Celestia** Data Availability (DA) layer and powered by **Conduit G2**’s massive throughput. Traditional web hosting relies on centralized servers that can be shut down, censored, or lost over time. CelestaraX ensures that your pages live permanently on-chain—publicly verifiable, tamper-proof, and free from single points of failure. By embracing on-chain data rather than minimizing it, we enable a new era of transparent and decentralized publishing.
 
 ## Key Features
 
-### Web3ite Smart Contract
+### `Web3ite` Smart Contract
 - Manages all on-chain data, including page creation, ownership, update requests, and fees.
 - Supports Single, MultiSig, or Permissionless ownership models.
 - Allows for immutable page flags to lock content permanently.
@@ -89,33 +93,44 @@ sequenceDiagram
 - **Unstoppable**: No central point of failure for the ad platform.
 - **Transparent**: All transactions and slot ownership details are verifiable on-chain.
 - **Automated**: Smart contract handles payments, durations, and slot management.
-- **Extensible**: Adaptable for sponsor walls, NFT displays, or game boards.
+- **Extensible**: Adaptable for sponsor walls, or NFT displays.
+
+This example showcases how CelestaraX enables fully decentralized applications by combining on-chain frontend hosting with smart contract data management.
+
 
 ## Why CelestaraX?
 
-### Permanent & Unstoppable
+### 1. Permanent & Unstoppable
 Once your page is recorded in Celestia’s DA layer, it remains verifiable and accessible for as long as the network exists. No central entity can erase or censor it.
 
-### Decentralized Proof & Verification
+### 2. Decentralized Proof & Verification
 All content is independently verifiable on-chain, ensuring authenticity and trust. Unlike traditional hosting, where data can be modified or removed without notice, CelestaraX guarantees permanence.
 
-### Easy Global Access
+### 3. Easy Global Access
 Content is not tied to a single server or URL and can be retrieved by any node in the network. CelestaraX aims to integrate with domain systems like **ENS** for seamless access.
 
-### Flexible Creation & Governance
-- Choose between **Single**, **MultiSig**, or **Permissionless** ownership for personal projects, collaborative groups, or open community hubs.
+### 4. Flexible Creation & Governance
+- Choose between **Single**, **MultiSig**, or **Permissionless** ownership for personal page, collaborative groups, or open community hubs.
 - Keep your page fully editable or mark it as **immutable** for a permanent record.
 
-### Empowering Creators & Communities
-CelestaraX introduces a new economic model through update fees:
-- **Personal Monetization**: Single owners retain full fee ownership.
-- **Collective Splitting**: MultiSig owners can distribute fees among co-owners.
-- **Open Participation**: Permissionless pages enable contributors to earn fees.
+### 5. Page Creator & Community Incentive Structure
+CelestaraX distributes update fees based on ownership type:
+- **Personal Monetization** (Single): Single owners retain full fee ownership.
+- **Collective Splitting** (MultiSig): MultiSig owners can distribute fees among co-owners.
+- **Open Participation** (Permissionless): Permissionless pages enable contributors to earn fees.
 
 ## Getting Started
 
-### Deploy / Use Web3ite
-Interact with the Web3ite contract via Etherscan or any web3 interface. To deploy manually:
+### 1. Deploy / Use Web3ite
+You can either use the existing deployed contract or deploy your own:
+
+#### Option 1: Use Existing Contract
+- Contract Address: `0x9E03FDf05833fAd3FF2ABB34F41c52308d65d6Fb`
+- View on [Blockscout Explorer](https://explorer-mammothon-g2-testnet-4a2w8v0xqy.t.conduit.xyz/address/0x9E03FDf05833fAd3FF2ABB34F41c52308d65d6Fb)
+- Interact with the contract via Blockscout or any web3 interface
+
+#### Option 2: Deploy Your Own Contract
+To deploy manually using Foundry:
 
 1. **Install Foundry**:
    ```bash
@@ -126,9 +141,20 @@ Interact with the Web3ite contract via Etherscan or any web3 interface. To deplo
 2. **Clone the repository**:
    ```bash
    git clone https://github.com/CelestaraX/Contracts.git
+   cd Contracts
    ```
 
-3. **Deploy the contract using Foundry**:
+3. **Install dependencies**:
+   ```bash
+   forge install
+   ```
+
+4. **Build the contracts**:
+   ```bash
+   forge build
+   ```
+
+5. **Deploy the contract using Foundry**:
    ```bash
    forge create src/Web3ite.sol:Web3ite \
        --rpc-url "https://rpc-mammothon-g2-testnet-4a2w8v0xqy.t.conduit.xyz/" \
@@ -140,19 +166,19 @@ Interact with the Web3ite contract via Etherscan or any web3 interface. To deplo
    ```
    Replace `<your-private-key>` with your actual private key. This command deploys **Web3ite** on the **Mammothon G2 Testnet** using Foundry. The contract can be verified via **Blockscout**.
 
-### Create Your Page
-- Submit your HTML (starting with `<!DOCTYPE html>`), define ownership rules, and optionally make it immutable.
+### 2. Create Your Page
+- Submit your HTML to the contract (starting with `<!DOCTYPE html>` and ending with `</html>`), define ownership rules, and optionally make it immutable.
 
-### Explore the Front-End
-- Use the official CelestaraX portal to browse, update, or manage fees.
+### 3. Explore the Front-End
+- Use the official CelestaraX portal or any third-party front-end to browse, update, or manage fees.
 
-### Build Your Own
+### 4. Build Your Own
 - Develop a custom front-end or dApp that interacts with the Web3ite contract.
 
 ## Join the On-Chain Web
 CelestaraX transforms web hosting from centralized servers to unbreakable, on-chain data. By placing the Web3ite contract at its core and enabling diverse front-end implementations, we invite developers, creators, and communities to build, collaborate, and innovate in a world where HTML, ownership, and economics converge seamlessly on-chain.
 
 ## Learn More
-- Repository: [CelestaraX/Contracts](https://github.com/CelestaraX/Contracts)
+- Contract Details: [CelestaraX/Contracts](https://github.com/CelestaraX/Contracts)
 - X: [@celestarax_](https://x.com/celestarax_)
 
