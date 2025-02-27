@@ -33,8 +33,11 @@ import { GET_PAGE_CREATEDS } from '@/lib/graphql/queries';
 import { PageCreated } from '@/types';
 import { config } from '@/wagmi'; // Example global wagmi config
 
+import { JsonRpcProvider, Contract } from 'ethers';
+import Image from 'next/image';
+
 /**
- * The contract ABI for the "vote" function
+ * ABI for the "vote" function
  */
 const VOTE_CONTRACT_ABI = [
   {
@@ -51,7 +54,7 @@ const VOTE_CONTRACT_ABI = [
 ];
 
 /**
- * Contract address & RPC for the voting contract
+ * Contract address & RPC
  */
 const VOTE_CONTRACT_ADDRESS = process.env
   .NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
@@ -67,10 +70,8 @@ if (!RPC_URL) {
 }
 
 /**
- * The contract ABI for fetching HTML by pageId
+ * ABI for fetching HTML by pageId
  */
-import { JsonRpcProvider, Contract } from 'ethers';
-
 const FETCH_CONTRACT_ABI = [
   {
     constant: true,
@@ -83,7 +84,35 @@ const FETCH_CONTRACT_ABI = [
 ];
 
 /**
- * Utility function to fetch HTML content from the on-chain contract
+ * Small spinner component
+ */
+function Spinner() {
+  return (
+    <svg
+      className='h-5 w-5 animate-spin text-white'
+      xmlns='http://www.w3.org/2000/svg'
+      fill='none'
+      viewBox='0 0 24 24'
+    >
+      <circle
+        className='opacity-25'
+        cx='12'
+        cy='12'
+        r='10'
+        stroke='currentColor'
+        strokeWidth='4'
+      />
+      <path
+        className='opacity-75'
+        fill='currentColor'
+        d='M4 12a8 8 0 018-8v8H4z'
+      />
+    </svg>
+  );
+}
+
+/**
+ * Fetch HTML content from chain
  */
 export async function fetchPageDataFromContract(
   pageId: string,
@@ -96,7 +125,7 @@ export async function fetchPageDataFromContract(
       provider,
     );
 
-    console.log(`Fetching HTML from chain for pageId: ${pageId}`);
+    console.log(`Fetching HTML for pageId: ${pageId}`);
     const htmlContent = await contract.getCurrentHtml(pageId);
     console.log(`HTML fetched:`, htmlContent);
     return htmlContent;
@@ -107,38 +136,31 @@ export async function fetchPageDataFromContract(
 }
 
 /**
- * Main Explorer page component.
- * Displays a list of pages (fetched via GraphQL),
- * fetches HTML content from the contract for the active page,
- * and allows voting on each page.
+ * Main Explorer page component
  */
 export default function HtmlCardSlider() {
-  /**
-   * 1) Fetch page data from subgraph (except for actual HTML content).
-   */
   const { data, loading, error, refetch } = useQuery<{ pages: PageCreated[] }>(
     GET_PAGE_CREATEDS,
   );
 
-  // Swiper reference & active slide index
+  // Swiper & index
   const [swiperRef, setSwiperRef] = useState<SwiperClass | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Local state for blockchain HTML
-  // We'll fetch it based on the currently active pageId.
+  // HTML from contract
   const [blockchainHtml, setBlockchainHtml] = useState('<p>Loading...</p>');
 
-  // Basic search query for filtering
+  // Search filter
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Drawer state (right side panel)
+  // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Wagmi account & connect modal
+  // Wallet
   const { isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
 
-  // Filtered pages by search
+  // Filter pages
   const allPages = useMemo(() => data?.pages || [], [data]);
   const filteredPages = useMemo(() => {
     return allPages.filter((page) =>
@@ -147,22 +169,34 @@ export default function HtmlCardSlider() {
   }, [searchQuery, allPages]);
 
   /**
-   * We store local like/dislike counts for immediate UI updates after voting.
+   * Local store for like/dislike counts.
+   * We'll parse subgraph data as number to avoid "01" glitch.
    */
   const [localVotes, setLocalVotes] = useState<{
     [pageId: string]: { totalLikes: number; totalDislikes: number };
   }>({});
 
-  // Initialize localVotes from subgraph data
+  /**
+   * Track the user's personal vote (like or dislike)
+   */
+  const [userVotes, setUserVotes] = useState<{
+    [pageId: string]: boolean | null;
+  }>({});
+
+  /**
+   * On subgraph data update, parse totalLikes/totalDislikes as numbers
+   */
   useEffect(() => {
     if (filteredPages.length > 0) {
       const updated: {
         [key: string]: { totalLikes: number; totalDislikes: number };
       } = {};
       filteredPages.forEach((page) => {
+        const likesNum = Number(page.totalLikes) || 0;
+        const dislikesNum = Number(page.totalDislikes) || 0;
         updated[page.pageId] = {
-          totalLikes: page.totalLikes,
-          totalDislikes: page.totalDislikes,
+          totalLikes: likesNum,
+          totalDislikes: dislikesNum,
         };
       });
       setLocalVotes((prev) => ({ ...prev, ...updated }));
@@ -170,24 +204,24 @@ export default function HtmlCardSlider() {
   }, [filteredPages]);
 
   /**
-   * We'll keep track of a pending transaction for each vote to disable the button, etc.
+   * Additional state to keep spinner alive until on-chain confirmation
    */
+  const [isTxAwaitingConfirmation, setIsTxAwaitingConfirmation] =
+    useState(false);
+
+  // Track pending tx
   const [pendingTxPageId, setPendingTxPageId] = useState<string | null>(null);
   const [pendingTxIsLike, setPendingTxIsLike] = useState<boolean | null>(null);
 
-  /**
-   * useWriteContract for voting transactions
-   */
-  const {
-    data: txData,
-    isPending,
-    writeContract,
-  } = useWriteContract({ config });
+  // Wagmi contract write
+  const { data: txData, writeContract } = useWriteContract({ config });
+
+  // Nav button conditions
+  const canPrev = activeIndex > 0;
+  const canNext = activeIndex < filteredPages.length - 1;
 
   /**
-   * handleVote -> user clicks "Like" or "Dislike"
-   * 1) If not connected, show wallet modal
-   * 2) If connected, simulate tx and write
+   * handleVote
    */
   const handleVote = useCallback(
     async (pageId: string, isLike: boolean) => {
@@ -201,10 +235,18 @@ export default function HtmlCardSlider() {
       }
 
       try {
+        // Set states for spinner
+        setIsTxAwaitingConfirmation(true);
         setPendingTxPageId(pageId);
         setPendingTxIsLike(isLike);
 
-        // Prepare transaction
+        // Immediately set userVotes
+        setUserVotes((prev) => ({
+          ...prev,
+          [pageId]: isLike,
+        }));
+
+        // Simulate
         const result = await simulateContract(config, {
           chainId: mammothon.id,
           address: VOTE_CONTRACT_ADDRESS,
@@ -213,7 +255,7 @@ export default function HtmlCardSlider() {
           args: [parseInt(pageId, 10), isLike],
         });
 
-        // Broadcast transaction
+        // Send TX
         writeContract(
           {
             ...result.request,
@@ -221,8 +263,15 @@ export default function HtmlCardSlider() {
           {
             onError: (err) => {
               console.error('Transaction error:', err);
+              // Reset states
+              setIsTxAwaitingConfirmation(false);
               setPendingTxPageId(null);
               setPendingTxIsLike(null);
+              // Reset userVotes
+              setUserVotes((prev) => ({
+                ...prev,
+                [pageId]: null,
+              }));
             },
             onSuccess: () => {
               console.log('Transaction broadcast success');
@@ -231,73 +280,88 @@ export default function HtmlCardSlider() {
         );
       } catch (err) {
         console.error('Error in simulateContract:', err);
+        // Reset
+        setIsTxAwaitingConfirmation(false);
         setPendingTxPageId(null);
         setPendingTxIsLike(null);
+        setUserVotes((prev) => ({
+          ...prev,
+          [pageId]: null,
+        }));
       }
     },
     [isConnected, openConnectModal, writeContract],
   );
 
   /**
-   * Whenever we get a txData from useWriteContract (the tx hash),
-   * wait for the transaction receipt to confirm, then update local state.
+   * Wait for confirmation
    */
   useEffect(() => {
     if (!txData) return;
+    let cancelled = false;
 
     const waitForReceipt = async () => {
       try {
         await waitForTransactionReceipt(config, {
-          hash: txData, // in this scenario, txData is just the hash string
+          hash: txData,
           chainId: mammothon.id,
           confirmations: 1,
         });
 
-        // If confirmed, update local UI
-        if (pendingTxPageId && pendingTxIsLike !== null) {
-          setLocalVotes((prev) => {
-            const curr = prev[pendingTxPageId] || {
-              totalLikes: 0,
-              totalDislikes: 0,
-            };
-            let newLikes = curr.totalLikes;
-            let newDislikes = curr.totalDislikes;
+        if (!cancelled) {
+          // Update local votes
+          if (pendingTxPageId && pendingTxIsLike !== null) {
+            setLocalVotes((prev) => {
+              const curr = prev[pendingTxPageId] || {
+                totalLikes: 0,
+                totalDislikes: 0,
+              };
+              let newLikes = curr.totalLikes;
+              let newDislikes = curr.totalDislikes;
 
-            if (pendingTxIsLike) {
-              newLikes += 1;
-            } else {
-              newDislikes += 1;
-            }
+              if (pendingTxIsLike) {
+                newLikes += 1;
+              } else {
+                newDislikes += 1;
+              }
 
-            return {
-              ...prev,
-              [pendingTxPageId]: {
-                totalLikes: newLikes,
-                totalDislikes: newDislikes,
-              },
-            };
-          });
+              return {
+                ...prev,
+                [pendingTxPageId]: {
+                  totalLikes: newLikes,
+                  totalDislikes: newDislikes,
+                },
+              };
+            });
+          }
+
+          // Refetch subgraph
+          refetch();
+
+          // Reset
+          setIsTxAwaitingConfirmation(false);
+          setPendingTxPageId(null);
+          setPendingTxIsLike(null);
         }
-
-        // Optionally refetch subgraph data
-        refetch();
-
-        // Reset
-        setPendingTxPageId(null);
-        setPendingTxIsLike(null);
       } catch (err) {
         console.error('Transaction confirmation error:', err);
-        setPendingTxPageId(null);
-        setPendingTxIsLike(null);
+        if (!cancelled) {
+          setIsTxAwaitingConfirmation(false);
+          setPendingTxPageId(null);
+          setPendingTxIsLike(null);
+        }
       }
     };
 
     waitForReceipt();
+
+    return () => {
+      cancelled = true;
+    };
   }, [txData, pendingTxPageId, pendingTxIsLike, refetch]);
 
   /**
-   * Whenever the activeIndex (or filteredPages) changes,
-   * fetch the on-chain HTML for that pageId from the contract.
+   * Fetch HTML from contract when activeIndex changes
    */
   useEffect(() => {
     if (filteredPages.length === 0) {
@@ -311,15 +375,11 @@ export default function HtmlCardSlider() {
       return;
     }
 
-    // Fetch HTML from contract
     fetchPageDataFromContract(page.pageId).then((html) => {
       setBlockchainHtml(html);
     });
   }, [filteredPages, activeIndex]);
 
-  /**
-   * Handle subgraph loading/error states
-   */
   if (loading) {
     return <div className='text-white'>Loading from subgraph...</div>;
   }
@@ -327,24 +387,28 @@ export default function HtmlCardSlider() {
     return <div className='text-white'>Error: {error.message}</div>;
   }
 
-  /**
-   * Toggle the side drawer
-   */
   const toggleDrawer = () => {
     setIsDrawerOpen((prev) => !prev);
   };
 
-  /**
-   * Close drawer if clicking the overlay
-   */
   const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).id === 'drawerOverlay') {
       setIsDrawerOpen(false);
     }
   };
 
-  // The currently active page
   const currentPage = filteredPages[activeIndex] || null;
+
+  /**
+   * Helper: should we show the spinner for a given button?
+   */
+  const shouldShowSpinner = (pageId: string, isLikeButton: boolean) => {
+    return (
+      isTxAwaitingConfirmation &&
+      pendingTxPageId === pageId &&
+      pendingTxIsLike === isLikeButton
+    );
+  };
 
   return (
     <div className='relative flex h-full w-full flex-col items-center justify-center gap-10'>
@@ -363,7 +427,7 @@ export default function HtmlCardSlider() {
         />
       </div>
 
-      {/** Button to toggle the info drawer */}
+      {/** Info drawer button */}
       <motion.button
         className='flex items-center gap-1 rounded-md bg-gray-600 px-3 py-2 text-white hover:bg-gray-500'
         whileTap={{ scale: 0.9 }}
@@ -373,13 +437,20 @@ export default function HtmlCardSlider() {
         <span>Show Details</span>
       </motion.button>
 
-      {/** Swiper navigation */}
+      {/** Swiper nav */}
       <div className='flex w-full max-w-[1200px] items-center justify-between px-4'>
         <motion.button
-          className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50'
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => swiperRef?.slidePrev()}
+          disabled={!canPrev}
+          className={`rounded-full p-3 text-white transition ${
+            canPrev
+              ? 'bg-white/30 hover:bg-white/50'
+              : 'cursor-not-allowed bg-gray-500/50'
+          }`}
+          whileHover={canPrev ? { scale: 1.2 } : {}}
+          whileTap={canPrev ? { scale: 0.9 } : {}}
+          onClick={() => {
+            if (canPrev) swiperRef?.slidePrev();
+          }}
         >
           <ChevronLeft size={36} />
         </motion.button>
@@ -403,11 +474,6 @@ export default function HtmlCardSlider() {
                 <h2 className='mb-3 text-center text-lg font-bold text-black'>
                   PageId: {page.pageId}
                 </h2>
-
-                {/** Render HTML from contract for the active slide.
-                 *  If this slide is currently active, show the blockchainHtml.
-                 *  Otherwise, show a placeholder.
-                 */}
                 {currentPage && currentPage.pageId === page.pageId ? (
                   <iframe
                     srcDoc={blockchainHtml}
@@ -425,68 +491,80 @@ export default function HtmlCardSlider() {
         </Swiper>
 
         <motion.button
-          className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50'
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => swiperRef?.slideNext()}
+          disabled={!canNext}
+          className={`rounded-full p-3 text-white transition ${
+            canNext
+              ? 'bg-white/30 hover:bg-white/50'
+              : 'cursor-not-allowed bg-gray-500/50'
+          }`}
+          whileHover={canNext ? { scale: 1.2 } : {}}
+          whileTap={canNext ? { scale: 0.9 } : {}}
+          onClick={() => {
+            if (canNext) swiperRef?.slideNext();
+          }}
         >
           <ChevronRight size={36} />
         </motion.button>
       </div>
 
-      {/** Like/Dislike buttons */}
+      {/** Like/Dislike */}
       {currentPage && (
         <div className='flex items-center gap-5'>
           <motion.button
             className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition ${
-              pendingTxPageId === currentPage.pageId && pendingTxIsLike
-                ? 'bg-green-400'
+              userVotes[currentPage.pageId] === true
+                ? 'bg-green-500'
                 : 'bg-gray-700'
+            } ${
+              shouldShowSpinner(currentPage.pageId, true)
+                ? 'pointer-events-none opacity-70'
+                : ''
             }`}
             whileTap={{ scale: 0.9 }}
             onClick={() => handleVote(currentPage.pageId, true)}
-            disabled={
-              isPending &&
-              pendingTxPageId === currentPage.pageId &&
-              (pendingTxIsLike ?? undefined)
-            }
           >
-            <ThumbsUp size={20} />
+            {shouldShowSpinner(currentPage.pageId, true) ? (
+              <Spinner />
+            ) : (
+              <ThumbsUp size={20} />
+            )}
             <span>
               Like (
               {localVotes[currentPage.pageId]?.totalLikes ??
-                currentPage.totalLikes}
+                (Number(currentPage.totalLikes) || 0)}
               )
             </span>
           </motion.button>
 
           <motion.button
             className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition ${
-              pendingTxPageId === currentPage.pageId &&
-              pendingTxIsLike === false
-                ? 'bg-red-400'
+              userVotes[currentPage.pageId] === false
+                ? 'bg-red-500'
                 : 'bg-gray-700'
+            } ${
+              shouldShowSpinner(currentPage.pageId, false)
+                ? 'pointer-events-none opacity-70'
+                : ''
             }`}
             whileTap={{ scale: 0.9 }}
             onClick={() => handleVote(currentPage.pageId, false)}
-            disabled={
-              isPending &&
-              pendingTxPageId === currentPage.pageId &&
-              pendingTxIsLike === false
-            }
           >
-            <ThumbsDown size={20} />
+            {shouldShowSpinner(currentPage.pageId, false) ? (
+              <Spinner />
+            ) : (
+              <ThumbsDown size={20} />
+            )}
             <span>
               Dislike (
               {localVotes[currentPage.pageId]?.totalDislikes ??
-                currentPage.totalDislikes}
+                (Number(currentPage.totalDislikes) || 0)}
               )
             </span>
           </motion.button>
         </div>
       )}
 
-      {/** Drawer for extra page info */}
+      {/** Drawer */}
       <AnimatePresence>
         {isDrawerOpen && currentPage && (
           <div
@@ -495,69 +573,97 @@ export default function HtmlCardSlider() {
             onClick={handleOverlayClick}
           >
             <motion.div
-              className='relative h-full w-80 bg-white p-4 text-black'
+              className='relative h-full w-[550px] rounded-l-2xl bg-zinc-900 p-6 text-white shadow-2xl'
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.3 }}
             >
               <button
-                className='absolute right-3 top-3 text-gray-700 hover:text-black'
+                className='absolute right-4 top-4 text-zinc-400 hover:text-zinc-200'
                 onClick={() => setIsDrawerOpen(false)}
               >
                 <X size={24} />
               </button>
 
-              <h2 className='mb-4 text-xl font-bold'>Page Details</h2>
-              <div className='flex flex-col gap-2'>
+              <h2 className='mb-4 text-2xl font-bold'>Page Details</h2>
+              <div className='flex flex-col gap-4 overflow-y-auto pr-2'>
                 <div>
-                  <span className='font-semibold'>Page ID:</span>{' '}
+                  <span className='font-semibold text-pink-400'>Page ID:</span>{' '}
                   {currentPage.pageId}
                 </div>
                 <div>
-                  <span className='font-semibold'>Name:</span>{' '}
+                  <span className='font-semibold text-pink-400'>Name:</span>{' '}
                   {currentPage.name}
                 </div>
                 <div>
-                  <span className='font-semibold'>Thumbnail:</span>{' '}
-                  {currentPage.thumbnail}
+                  <span className='font-semibold text-pink-400'>
+                    Thumbnail:
+                  </span>
+                  <div className='mt-2'>
+                    {currentPage.thumbnail ? (
+                      <Image
+                        src={currentPage.thumbnail}
+                        alt='Thumbnail'
+                        className='rounded-md border border-gray-800'
+                        width={200}
+                        height={200}
+                      />
+                    ) : (
+                      <p className='text-gray-400'>No thumbnail available</p>
+                    )}
+                  </div>
                 </div>
                 <div>
-                  <span className='font-semibold'>Creator:</span>{' '}
+                  <span className='font-semibold text-pink-400'>Creator:</span>{' '}
                   {currentPage.creator}
                 </div>
                 <div>
-                  <span className='font-semibold'>Ownership Type:</span>{' '}
+                  <span className='font-semibold text-pink-400'>
+                    Ownership Type:
+                  </span>{' '}
                   {currentPage.ownershipType}
                 </div>
                 <div>
-                  <span className='font-semibold'>Update Fee:</span>{' '}
+                  <span className='font-semibold text-pink-400'>
+                    Update Fee:
+                  </span>{' '}
                   {currentPage.updateFee}
                 </div>
                 <div>
-                  <span className='font-semibold'>Total Likes:</span>{' '}
+                  <span className='font-semibold text-pink-400'>
+                    Total Likes:
+                  </span>{' '}
                   {localVotes[currentPage.pageId]?.totalLikes ??
-                    currentPage.totalLikes}
+                    (Number(currentPage.totalLikes) || 0)}
                 </div>
                 <div>
-                  <span className='font-semibold'>Total Dislikes:</span>{' '}
+                  <span className='font-semibold text-pink-400'>
+                    Total Dislikes:
+                  </span>{' '}
                   {localVotes[currentPage.pageId]?.totalDislikes ??
-                    currentPage.totalDislikes}
+                    (Number(currentPage.totalDislikes) || 0)}
                 </div>
                 <div>
-                  <span className='font-semibold'>Balance:</span>{' '}
+                  <span className='font-semibold text-pink-400'>Balance:</span>{' '}
                   {currentPage.balance}
                 </div>
                 <div>
-                  <span className='font-semibold'>MultiSig Owners:</span>{' '}
+                  <span className='font-semibold text-pink-400'>
+                    MultiSig Owners:
+                  </span>{' '}
                   {currentPage.multiSigOwners?.join(', ')}
                 </div>
                 <div>
-                  <span className='font-semibold'>MultiSig Threshold:</span>{' '}
+                  <span className='font-semibold text-pink-400'>
+                    MultiSig Threshold:
+                  </span>{' '}
                   {currentPage.multiSigThreshold}
                 </div>
                 <div>
-                  <span className='font-semibold'>Immutable (IMT):</span>{' '}
+                  <span className='font-semibold text-pink-400'>
+                    Immutable:
+                  </span>{' '}
                   {String(currentPage.imt)}
                 </div>
               </div>
@@ -570,9 +676,10 @@ export default function HtmlCardSlider() {
 }
 
 /**
- * Example GET_PAGE_CREATEDS query for reference:
+ * Example GET_PAGE_CREATEDS query:
  *
  * import { gql } from '@apollo/client';
+ *
  * export const GET_PAGE_CREATEDS = gql`
  *   query GetAllPages {
  *     pages(first: 1000, orderBy: pageId, orderDirection: asc) {
@@ -593,15 +700,4 @@ export default function HtmlCardSlider() {
  *     }
  *   }
  * `;
- */
-
-/**
- * Example Apollo Client setup (if needed in a separate file):
- *
- * import { ApolloClient, InMemoryCache } from '@apollo/client';
- * const client = new ApolloClient({
- *   uri: process.env.NEXT_PUBLIC_API_URL,
- *   cache: new InMemoryCache(),
- * });
- * export default client;
  */
