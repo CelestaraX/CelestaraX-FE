@@ -14,7 +14,7 @@ export default function HomePage() {
       {/* 로고 + 문구 */}
       <div className='text-center'>
         <div className='glitch-effect text-7xl font-bold text-pink-500'>
-          WEB3ITE
+          CELESTARAX
         </div>
         <p className='mt-4 max-w-md text-center text-xl text-gray-300'>
           The world’s first decentralized prover network. <br />
