@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'WEB3ITE',
-  description: 'Make your WEB3ITE',
+  title: 'CELESTARAX',
+  description: 'Make your planet',
 };
 
 export default function RootLayout({

@@ -26,9 +26,9 @@ export default function Header({ onDeployClick }: HeaderProps) {
   return (
     <header className='sticky top-0 z-50 flex w-full items-center justify-between bg-black bg-opacity-50 px-7 py-6 backdrop-blur-lg'>
       <div className='flex items-center space-x-2'>
-        <Image src='/logo.png' alt='WEB3ITE Logo' width={50} height={50} />
+        <Image src='/logo.png' alt='CELESTARAX Logo' width={50} height={50} />
         <span className='font-mono text-2xl font-bold tracking-wide text-[#ff00ff]'>
-          WEB3ITE
+          CELESTARAX
         </span>
       </div>
 
