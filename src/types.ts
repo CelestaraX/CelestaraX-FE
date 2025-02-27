@@ -15,12 +15,18 @@ export interface OrbitingHtmlPlanetProps {
 }
 
 export interface PageCreated {
-  id: string; // 페이지 생성 트랜잭션 ID
-  pageId: string; // 서비스 내에서의 페이지 ID
-  creator: string; // 페이지 생성자 (지갑 주소)
-  ownershipType: number; // 0 = Single, 1 = MultiSig, 2 = Permissionless
-  updateFee: string; // 업데이트 수수료 (Wei 단위)
-  imt: boolean; // 페이지가 불변인지 여부
-  blockNumber: string; // 블록 번호
-  blockTimestamp: string; // 페이지 생성 타임스탬프
+  id: string;
+  pageId: string;
+  creator: string;
+  name: string;
+  thumbnail: string; // Base64 encoded image
+  ownershipType: number; // 0: Single, 1: MultiSig, 2: Permissionless (가정)
+  updateFee: string;
+  imt: boolean;
+  currentHtml: string;
+  totalLikes: number;
+  totalDislikes: number;
+  balance: string;
+  multiSigOwners: string[] | null;
+  multiSigThreshold: number | null;
 }
