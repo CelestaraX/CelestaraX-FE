@@ -59,13 +59,13 @@ A decentralized advertising platform that demonstrates the power of combining on
 
 ### Core Components
 
-#### 1. Ad Slot Smart Contract
+#### 1. Million Dollar Contract
 - Manages multiple advertising slots with image, link, and expiration data
 - Handles slot purchases and ownership transfers
 - Functions as an on-chain database for all ad content
 - Automated expiration and slot availability management
 
-#### 2. On-Chain Frontend (via CelestaraX)
+#### 2. Onchain Frontend (via CelestaraX)
 - Complete HTML/CSS/JS interface stored on-chain
 - Real-time integration with ad slot contract
 - Displays dynamic grid of current advertisements
@@ -76,14 +76,13 @@ A decentralized advertising platform that demonstrates the power of combining on
 ```mermaid
 sequenceDiagram
     participant User as User (Buyer/Viewer)
-    participant OnchainPage as "On-Chain HTML Page (CelestaraX)"
-    participant AdContract as "Ad Slots Contract"
-    participant Celestia as "Data Availability Layer"
+    participant OnchainPage as Onchain Page (CelestaraX)
+    participant AdContract as Million Dollar Contract
 
     User->>OnchainPage: Visit Million Dollar Page
     OnchainPage->>AdContract: Read current Ad Slot data
     AdContract-->>OnchainPage: Return slot data
-    OnchainPage-->>User: Render ad grid
+    OnchainPage-->>User: Render Onchain Million Dollar Page
 
     alt Buy or Update Slot
         User->>AdContract: purchaseAd/updateAd
