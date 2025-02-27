@@ -6,7 +6,7 @@
 
 **CelestaraX** is a next-generation platform for fully on-chain HTML pages, built on the **Celestia** Data Availability (DA) layer and powered by **Conduit G2**’s massive throughput. Traditional web hosting relies on centralized servers that can be shut down, censored, or lost over time. CelestaraX ensures that your pages live permanently on-chain—publicly verifiable, tamper-proof, and free from single points of failure. By embracing on-chain data rather than minimizing it, we enable a new era of transparent and decentralized publishing.
 
-## 📌 Key Features
+## Key Features
 
 ### `Web3ite` Smart Contract
 - Manages all on-chain data, including page creation, ownership, update requests, and fees.
