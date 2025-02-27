@@ -598,6 +598,7 @@ export default function DeployPage() {
               multiThreshold: '',
             });
             setUseDefaultThumbnail(false);
+            setProgress(0);
             // wait for txHash in useEffect
           },
         },
