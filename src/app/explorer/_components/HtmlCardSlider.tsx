@@ -27,7 +27,7 @@ import {
 import { useAccount, useWriteContract } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { simulateContract, waitForTransactionReceipt } from 'wagmi/actions';
-import { mainnet } from 'wagmi/chains';
+import { mammothon } from '@/wagmi';
 
 import { GET_PAGE_CREATEDS } from '@/lib/graphql/queries';
 import { PageCreated } from '@/types';
@@ -206,7 +206,7 @@ export default function HtmlCardSlider() {
 
         // Prepare transaction
         const result = await simulateContract(config, {
-          chainId: mainnet.id,
+          chainId: mammothon.id,
           address: VOTE_CONTRACT_ADDRESS,
           abi: VOTE_CONTRACT_ABI,
           functionName: 'vote',
@@ -249,7 +249,7 @@ export default function HtmlCardSlider() {
       try {
         await waitForTransactionReceipt(config, {
           hash: txData, // in this scenario, txData is just the hash string
-          chainId: mainnet.id,
+          chainId: mammothon.id,
           confirmations: 1,
         });
 
