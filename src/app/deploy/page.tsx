@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { useAccount } from 'wagmi';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useAccount, useWriteContract } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import Header from '@/components/layout/Header';
-import { X, Upload } from 'lucide-react';
+import { X, Upload, HelpCircle } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import CustomStarsPlanet from '@/components/CustomStarsPlanet';
 
+import { simulateContract, waitForTransactionReceipt } from 'wagmi/actions';
+import { config, mammothon } from '@/wagmi'; // your global wagmi config
+import { defaultThumbnailBase64 } from '@/const'; // your default thumbnail in base64
+
 /**
- * CircularProgress component to display a ring of progress around the planet
+ * CircularProgress - ring around the planet to show progress
  */
 const CircularProgress = ({ progress }: { progress: number }) => {
   const radius = 90;
@@ -57,126 +61,126 @@ const CircularProgress = ({ progress }: { progress: number }) => {
 };
 
 /**
- * FormData interface to manage form states
+ * Spinner component for indicating TX in progress
  */
-interface FormData {
-  name: string; // Planet name
-  immutable: string; // "True" or "False"
-  ownership: string; // "Single" | "MultiSig" | "Permissionless"
-  fee: string; // Modification fee
-  thumbnail: string; // Base64 representation of the uploaded thumbnail
-  htmlFile: string; // Contents of the uploaded HTML file as a string
-  singleAddress: string; // Address input if ownership is Single OR Permissionless
-  multiAddresses: string[]; // Addresses for multi-sig
-  multiThreshold: string; // Approval threshold for multi-sig
+function Spinner() {
+  return (
+    <svg
+      className='h-5 w-5 animate-spin text-white'
+      xmlns='http://www.w3.org/2000/svg'
+      fill='none'
+      viewBox='0 0 24 24'
+    >
+      <circle
+        className='opacity-25'
+        cx='12'
+        cy='12'
+        r='10'
+        stroke='currentColor'
+        strokeWidth='4'
+      />
+      <path
+        className='opacity-75'
+        fill='currentColor'
+        d='M4 12a8 8 0 018-8v8H4z'
+      />
+    </svg>
+  );
 }
 
 /**
- * A helper to define dynamic total steps for progress calculation
- * (Used to compute progress %)
+ * FormData interface for planet creation
  */
-const getTotalSteps = (form: FormData) => {
+interface FormData {
+  name: string;
+  immutable: string; // "True" | "False"
+  ownership: string; // "Single" | "MultiSig" | "Permissionless"
+  fee: string;
+  thumbnail: string; // base64
+  htmlFile: string; // must have <!DOCTYPE html> ... </html>
+  singleAddress: string;
+  multiAddresses: string[];
+  multiThreshold: string;
+}
+
+/**
+ * Calculate total steps for progress
+ */
+function getTotalSteps(form: FormData) {
   let steps = 0;
-
-  // (1) Name
+  // 1) Name
+  steps++;
+  // 2) Immutable
+  steps++;
+  // 3) Ownership
   steps++;
 
-  // (2) Immutable (true/false)
-  steps++;
-
-  // (3) Ownership
-  steps++;
-
-  // (4) Fee (only if immutable = 'False' and ownership != 'Permissionless')
+  // 4) Fee if not disabled
   const feeDisabled =
     form.immutable !== 'False' || form.ownership === 'Permissionless';
-  if (!feeDisabled) {
-    steps++;
-  }
+  if (!feeDisabled) steps++;
 
-  // (5) Thumbnail
+  // 5) Thumbnail
+  steps++;
+  // 6) HTML file
   steps++;
 
-  // (6) HTML file
-  steps++;
-
-  // Ownership detail steps:
-  // If Single or Permissionless => 1 step for singleAddress
+  // If Single or Permissionless => singleAddress
   if (form.ownership === 'Single' || form.ownership === 'Permissionless') {
     steps++;
   }
-
-  // If MultiSig => threshold + each address is a step
+  // If MultiSig => threshold + each address
   if (form.ownership === 'MultiSig') {
-    // threshold is a step
-    steps++;
-    // each address is a step
-    steps += form.multiAddresses.length;
+    steps++; // threshold
+    steps += form.multiAddresses.length; // each address
   }
 
   return steps;
-};
+}
 
 /**
- * A helper to define how many steps have been completed
- * (Used to compute progress %)
+ * Calculate completed steps
  */
-const getCompletedSteps = (form: FormData) => {
+function getCompletedSteps(form: FormData) {
   let completed = 0;
-
-  // (1) Name
   if (form.name.trim() !== '') completed++;
-
-  // (2) Immutable
   if (form.immutable !== '') completed++;
-
-  // (3) Ownership
   if (form.ownership !== '') completed++;
 
-  // (4) Fee (only if immutable = 'False' && ownership != 'Permissionless')
+  // fee check if not disabled
   const feeDisabled =
     form.immutable !== 'False' || form.ownership === 'Permissionless';
   if (!feeDisabled) {
     if (form.fee.trim() !== '') completed++;
   }
 
-  // (5) Thumbnail
   if (form.thumbnail.trim() !== '') completed++;
-
-  // (6) HTML file
   if (form.htmlFile.trim() !== '') completed++;
 
-  // Single or Permissionless => check singleAddress
   if (form.ownership === 'Single' || form.ownership === 'Permissionless') {
     if (form.singleAddress.trim() !== '') completed++;
   }
-
-  // MultiSig => threshold + each address
   if (form.ownership === 'MultiSig') {
-    // threshold must be valid
-    const thresholdNum = parseInt(form.multiThreshold, 10);
+    const threshNum = parseInt(form.multiThreshold, 10);
     if (
-      !isNaN(thresholdNum) &&
-      thresholdNum > 0 &&
-      thresholdNum <= form.multiAddresses.length
+      !isNaN(threshNum) &&
+      threshNum > 0 &&
+      threshNum <= form.multiAddresses.length
     ) {
       completed++;
     }
-    // each address must be non-empty
     form.multiAddresses.forEach((addr) => {
-      if (addr.trim() !== '') {
-        completed++;
-      }
+      if (addr.trim() !== '') completed++;
     });
   }
 
   return completed;
-};
+}
 
 /**
- * A helper to gather validation errors for each form field (and sub-fields).
+ * Validate fields
  */
-const getErrors = (form: FormData) => {
+function getErrors(form: FormData) {
   const errors: {
     name?: string;
     immutable?: string;
@@ -185,85 +189,127 @@ const getErrors = (form: FormData) => {
     thumbnail?: string;
     htmlFile?: string;
     singleAddress?: string;
-    multiAddresses?: string[]; // array of address errors
+    multiAddresses?: string[];
     multiThreshold?: string;
   } = {};
 
-  // Name check
-  if (!form.name.trim()) {
-    errors.name = 'Name is required.';
-  }
+  if (!form.name.trim()) errors.name = 'Name is required.';
+  if (!form.immutable) errors.immutable = 'You must choose True or False.';
+  if (!form.ownership) errors.ownership = 'You must select ownership.';
 
-  // Immutable check
-  if (!form.immutable) {
-    errors.immutable = 'You must choose True or False.';
-  }
-
-  // Ownership check
-  if (!form.ownership) {
-    errors.ownership = 'You must select ownership.';
-  }
-
-  // Fee check (only if immutable === 'False' && ownership !== 'Permissionless')
   if (form.immutable === 'False' && form.ownership !== 'Permissionless') {
     if (!form.fee.trim()) {
-      errors.fee = 'Fee is required (because immutable = False).';
+      errors.fee = 'Fee is required (immutable = False).';
     }
   }
 
-  // Thumbnail check
-  if (!form.thumbnail.trim()) {
-    errors.thumbnail = 'Thumbnail is required.';
-  }
+  if (!form.thumbnail.trim()) errors.thumbnail = 'Thumbnail is required.';
+  if (!form.htmlFile.trim()) errors.htmlFile = 'HTML file is required.';
 
-  // HTML File check
-  if (!form.htmlFile.trim()) {
-    errors.htmlFile = 'HTML file is required.';
-  }
-
-  // Single or Permissionless => singleAddress check
   if (form.ownership === 'Single' || form.ownership === 'Permissionless') {
     if (!form.singleAddress.trim()) {
-      errors.singleAddress = 'Address is required.';
+      errors.singleAddress = 'Owner address is required.';
     }
   }
 
-  // MultiSig => addresses + threshold checks
   if (form.ownership === 'MultiSig') {
-    // For addresses, gather individual errors if empty
-    const multiAddrErrors: string[] = [];
+    // addresses
+    const multiErr: string[] = [];
     form.multiAddresses.forEach((addr, idx) => {
       if (!addr.trim()) {
-        multiAddrErrors[idx] = `Address #${idx + 1} is required.`;
+        multiErr[idx] = `Address #${idx + 1} is required.`;
       }
     });
-    if (multiAddrErrors.filter(Boolean).length > 0) {
-      errors.multiAddresses = multiAddrErrors;
+    if (multiErr.filter(Boolean).length > 0) {
+      errors.multiAddresses = multiErr;
     }
-
-    // Threshold must not be empty, must be a number, must not exceed #addresses
+    // threshold
     if (!form.multiThreshold.trim()) {
       errors.multiThreshold = 'Threshold is required.';
     } else {
-      const thresholdNum = parseInt(form.multiThreshold, 10);
-      if (isNaN(thresholdNum) || thresholdNum <= 0) {
-        errors.multiThreshold = 'Threshold must be a valid positive number.';
-      } else if (thresholdNum > form.multiAddresses.length) {
-        errors.multiThreshold =
-          'Threshold cannot exceed the number of addresses.';
+      const n = parseInt(form.multiThreshold, 10);
+      if (isNaN(n) || n <= 0) {
+        errors.multiThreshold = 'Threshold must be positive number.';
+      } else if (n > form.multiAddresses.length) {
+        errors.multiThreshold = 'Threshold cannot exceed addresses count.';
       }
     }
   }
 
   return errors;
-};
+}
+
+/**
+ * Convert "Single|MultiSig|Permissionless" => 0|1|2
+ */
+function getOwnershipTypeIndex(val: string) {
+  if (val === 'Single') return 0;
+  if (val === 'MultiSig') return 1;
+  return 2;
+}
+
+/** If "True" => boolean true */
+function parseImmutable(val: string): boolean {
+  return val === 'True';
+}
+
+/** Use default thumbnail base64 from a const file */
+const DEFAULT_THUMBNAIL_URL = defaultThumbnailBase64;
+
+/** The contract ABI for createPage */
+const CREATE_PAGE_ABI = [
+  {
+    inputs: [
+      { internalType: 'string', name: '_name', type: 'string' },
+      { internalType: 'string', name: '_thumbnail', type: 'string' },
+      { internalType: 'string', name: '_initialHtml', type: 'string' },
+      {
+        components: [
+          {
+            internalType: 'enum IWeb3ite.OwnershipType',
+            name: 'ownershipType',
+            type: 'uint8',
+          },
+          {
+            internalType: 'address[]',
+            name: 'multiSigOwners',
+            type: 'address[]',
+          },
+          {
+            internalType: 'uint256',
+            name: 'multiSigThreshold',
+            type: 'uint256',
+          },
+        ],
+        internalType: 'struct IWeb3ite.OwnershipConfig',
+        name: '_ownerConfig',
+        type: 'tuple',
+      },
+      { internalType: 'uint256', name: '_updateFee', type: 'uint256' },
+      { internalType: 'bool', name: '_imt', type: 'bool' },
+    ],
+    name: 'createPage',
+    outputs: [{ internalType: 'uint256', name: 'pageId', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+];
+
+const CREATE_PAGE_CONTRACT_ADDRESS = process.env
+  .NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
 
 export default function DeployPage() {
-  // Wallet connection
   const { isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
 
-  // Initialize form data
+  // from useWriteContract (like Explorer)
+  const {
+    data: txHash,
+    isPending,
+    writeContract,
+  } = useWriteContract({ config });
+
+  // Form data
   const [formData, setFormData] = useState<FormData>({
     name: '',
     immutable: '',
@@ -276,16 +322,16 @@ export default function DeployPage() {
     multiThreshold: '',
   });
 
-  // Track overall form completion progress
-  const [progress, setProgress] = useState<number>(0);
+  // Use default thumbnail
+  const [useDefaultThumbnail, setUseDefaultThumbnail] = useState(false);
 
-  // Store validation errors in state
-  const [errors, setErrors] = useState<{
-    [key: string]: string | string[];
-  }>({});
+  // progress & errors
+  const [progress, setProgress] = useState(0);
+  const [errors, setErrors] = useState<{ [key: string]: string | string[] }>(
+    {},
+  );
 
-  // Keep track of which fields have been "touched"
-  // We'll also handle multiAddresses separately (so we can show per-address errors only after user has interacted)
+  // touched
   const [touched, setTouched] = useState<
     Partial<Record<keyof FormData, boolean>>
   >({});
@@ -293,231 +339,338 @@ export default function DeployPage() {
     [],
   );
 
-  // We'll also track if user has tried to submit
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
-  // Track which dropdowns are open
+  // dropdown states
   const [isOpen, setIsOpen] = useState<{ [key in keyof FormData]?: boolean }>(
     {},
   );
-
-  // For clicking outside to close dropdowns
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Toggles open/close for a particular dropdown field
-   */
-  const handleDropdownToggle = (field: keyof FormData) => {
-    setIsOpen((prev) => ({ ...prev, [field]: !prev[field] }));
-  };
+  // deploying spinner
+  const [isDeploying, setIsDeploying] = useState(false);
 
   /**
-   * Closes dropdown if user clicks outside
+   * Close dropdown if user clicks outside (DOM event)
    */
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    function handleClickOutside(event: Event) {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsOpen({});
       }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
+    }
+    document.addEventListener('mousedown', handleClickOutside as EventListener);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener(
+        'mousedown',
+        handleClickOutside as EventListener,
+      );
     };
   }, []);
 
   /**
-   * Calculates and updates the progress + errors whenever formData changes
+   * Toggle dropdown
    */
-  const updateForm = (updatedForm: FormData) => {
-    // Update state
-    setFormData(updatedForm);
-
-    // Calculate progress
-    const totalSteps = getTotalSteps(updatedForm);
-    const completedSteps = getCompletedSteps(updatedForm);
-    const newProgress = Math.round((completedSteps / totalSteps) * 100);
-    setProgress(newProgress);
-
-    // Calculate and store errors
-    const newErrors = getErrors(updatedForm);
-    setErrors(newErrors);
+  const handleDropdownToggle = (field: keyof FormData) => {
+    setIsOpen((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   /**
-   * We show an error if the field is "touched" or user has "submitted".
+   * updateForm => recalc progress & errors
    */
+  const updateForm = (updatedForm: FormData) => {
+    setFormData(updatedForm);
+
+    const totalSteps = getTotalSteps(updatedForm);
+    const done = getCompletedSteps(updatedForm);
+    setProgress(Math.round((done / totalSteps) * 100));
+
+    const newErr = getErrors(updatedForm);
+    setErrors(newErr);
+  };
+
   const shouldShowError = (field: keyof FormData) => {
     return touched[field] || hasSubmitted;
   };
-
-  /**
-   * For multiAddresses, we show error for a specific index if that index is touched OR user has submitted.
-   */
   const shouldShowMultiAddressError = (index: number) => {
     return touchedMultiAddresses[index] || hasSubmitted;
   };
 
   /**
-   * Handles file or text input changes
-   * Converts thumbnail to base64 and HTML file to text
+   * Handle input changes
    */
   const handleInputChange = async (
     field: keyof FormData,
     value: string | File | null,
   ) => {
+    // If user chooses default thumbnail, we now override formData.thumbnail
+    // with default base64 so the step is considered complete.
+    if (field === 'thumbnail' && useDefaultThumbnail) {
+      // If user tries to upload a file while default is checked, we can ignore or override.
+      // Here let's just ignore the file. But we keep the default base64 in the form data
+      return;
+    }
+
     // If it's a file for thumbnail
     if (field === 'thumbnail' && value instanceof File) {
       const file = value;
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
-        const updatedForm = { ...formData, [field]: base64 };
-        updateForm(updatedForm);
+        updateForm({ ...formData, [field]: base64 });
       };
       reader.readAsDataURL(file);
       return;
     }
 
+    // A helper to ensure `</html>` is present
+    const ensureHtmlClosingTag = (html: string): string => {
+      const trimmed = html.trim();
+      return trimmed.endsWith('</html>') ? trimmed : `${trimmed}</html>`;
+    };
+
     // If it's a file for HTML
     if (field === 'htmlFile' && value instanceof File) {
       const file = value;
       const reader = new FileReader();
+
       reader.onload = () => {
-        const content = reader.result as string;
-        const updatedForm = { ...formData, [field]: content };
-        updateForm(updatedForm);
+        let content = reader.result as string;
+
+        // Remove trailing spaces
+        content = content.replace(/\s+$/g, '');
+        // Convert Windows line-endings to Unix
+        content = content.replace(/\r\n/g, '\n');
+        // Collapse multiple blank lines
+        content = content.replace(/\n{2,}/g, '\n');
+
+        // Ensure closing </html>
+        content = ensureHtmlClosingTag(content);
+
+        updateForm({ ...formData, htmlFile: content });
       };
+
       reader.readAsText(file);
       return;
     }
 
-    // Otherwise it's a normal text input
-    const updatedForm = { ...formData, [field]: value || '' };
-    updateForm(updatedForm);
+    // Otherwise it's normal text
+    updateForm({ ...formData, [field]: value || '' });
   };
 
-  /**
-   * Mark a field as touched (for single fields)
-   */
+  // blur
   const handleFieldBlur = (field: keyof FormData) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  /**
-   * Adds a new empty address to the multiAddresses array
-   * Also mark the new address as not touched
-   */
+  // multi-sig address
   const addMultiAddress = () => {
-    const updatedForm = {
+    const updated = {
       ...formData,
       multiAddresses: [...formData.multiAddresses, ''],
     };
-    updateForm(updatedForm);
-
-    // Also update touchedMultiAddresses
+    updateForm(updated);
     setTouchedMultiAddresses((prev) => [...prev, false]);
   };
-
-  /**
-   * Removes a specific address from the multiAddresses array
-   */
   const removeMultiAddress = (index: number) => {
-    const updatedList = formData.multiAddresses.filter((_, i) => i !== index);
-    const updatedForm = { ...formData, multiAddresses: updatedList };
-    updateForm(updatedForm);
-
-    // Also remove from touchedMultiAddresses
+    const newArr = formData.multiAddresses.filter((_, i) => i !== index);
+    updateForm({ ...formData, multiAddresses: newArr });
     setTouchedMultiAddresses((prev) => prev.filter((_, i) => i !== index));
   };
-
-  /**
-   * Updates a specific address in the multiAddresses array
-   */
-  const handleMultiAddressChange = (index: number, newValue: string) => {
-    const updatedList = [...formData.multiAddresses];
-    updatedList[index] = newValue;
-    const updatedForm = { ...formData, multiAddresses: updatedList };
-    updateForm(updatedForm);
+  const handleMultiAddressChange = (index: number, val: string) => {
+    const newArr = [...formData.multiAddresses];
+    newArr[index] = val;
+    updateForm({ ...formData, multiAddresses: newArr });
   };
-
-  /**
-   * Mark a specific multi-address input as touched on blur
-   */
   const handleMultiAddressBlur = (index: number) => {
     setTouchedMultiAddresses((prev) => {
-      const newState = [...prev];
-      newState[index] = true;
-      return newState;
+      const newT = [...prev];
+      newT[index] = true;
+      return newT;
     });
   };
 
+  // isFeeDisabled
+  const isFeeDisabled =
+    formData.immutable !== 'False' || formData.ownership === 'Permissionless';
+  // progress
+  const validProgress = isNaN(progress) ? 0 : progress;
+
   /**
-   * Handles the Deploy logic
+   * Deploy logic => simulate => writeContract => wait for txHash => wait for receipt
    */
-  const handleDeploy = () => {
-    // Mark that user has submitted (this will reveal all errors)
+  const handleDeploy = useCallback(async () => {
     setHasSubmitted(true);
 
-    // If not connected, open wallet modal
     if (!isConnected) {
       if (openConnectModal) {
         openConnectModal();
       } else {
-        alert('Cannot open wallet modal for connection.');
+        alert('Cannot open wallet modal.');
       }
       return;
     }
 
-    // If form is incomplete or has errors, block
-    if (progress < 100 || Object.keys(errors).length > 0) {
-      alert(
-        'Please fix all errors and fill in all required fields before deploying.',
-      );
+    if (validProgress < 100 || Object.keys(errors).length > 0) {
+      alert('Please fix errors and complete all fields before deploying.');
       return;
     }
 
-    // Here you would pass formData to your contract
-    alert(
-      'Deployment successful (simulation)!\nNow integrate with your contract logic.',
-    );
-  };
+    try {
+      setIsDeploying(true);
+
+      // If "Use default thumbnail" is checked, we force the formData.thumbnail to default
+      let finalThumbnail = formData.thumbnail;
+      if (useDefaultThumbnail) {
+        finalThumbnail = DEFAULT_THUMBNAIL_URL;
+      }
+
+      // ownership index
+      const ownershipIndex = getOwnershipTypeIndex(formData.ownership);
+      // parse immutable
+      const imt = parseImmutable(formData.immutable);
+
+      // multi-sig
+      let multiSigOwners: string[] = [];
+      let multiSigThreshold = 0;
+      if (ownershipIndex === 0) {
+        // Single
+        multiSigOwners = [formData.singleAddress];
+        multiSigThreshold = 1;
+      } else if (ownershipIndex === 1) {
+        // MultiSig
+        multiSigOwners = formData.multiAddresses;
+        multiSigThreshold = parseInt(formData.multiThreshold, 10) || 1;
+      }
+      // If ownershipIndex=2 => permissionless => no owners/threshold needed
+
+      // fee
+      let updateFee = 0;
+      if (!isFeeDisabled) {
+        updateFee = parseInt(formData.fee, 10) || 0;
+      }
+
+      // simulate
+      const simResult = await simulateContract(config, {
+        chainId: mammothon.id,
+        address: CREATE_PAGE_CONTRACT_ADDRESS,
+        abi: CREATE_PAGE_ABI,
+        functionName: 'createPage',
+        args: [
+          formData.name,
+          finalThumbnail,
+          formData.htmlFile,
+          {
+            ownershipType: ownershipIndex,
+            multiSigOwners,
+            multiSigThreshold,
+          },
+          updateFee,
+          imt,
+        ],
+      });
+
+      // broadcast
+      writeContract(
+        {
+          ...simResult.request,
+        },
+        {
+          onError: (err) => {
+            console.error('CreatePage TX Error:', err);
+            setIsDeploying(false);
+          },
+          onSuccess: () => {
+            console.log('CreatePage TX broadcast success');
+            // Optionally reset the form
+            setFormData({
+              name: '',
+              immutable: '',
+              ownership: '',
+              fee: '',
+              thumbnail: '',
+              htmlFile: '',
+              singleAddress: '',
+              multiAddresses: [],
+              multiThreshold: '',
+            });
+            setUseDefaultThumbnail(false);
+            // wait for txHash in useEffect
+          },
+        },
+      );
+    } catch (err) {
+      console.error('Deployment error:', err);
+      alert('Deployment failed. Check console for details.');
+      setIsDeploying(false);
+    }
+  }, [
+    isConnected,
+    openConnectModal,
+    validProgress,
+    errors,
+    formData,
+    useDefaultThumbnail,
+    isFeeDisabled,
+    writeContract,
+  ]);
 
   /**
-   * Utility function to handle disabled input styling
+   * Wait for txHash => waitForTransactionReceipt => done
    */
-  const getInputClass = (disabled: boolean) => {
-    return `
-      w-full 
-      rounded-xl 
-      border 
-      border-gray-700 
-      px-4 py-3
-      outline-none 
-      transition-all 
-      duration-200 
-      focus:ring-2 
-      focus:ring-gray-600 
-      ${
-        disabled
-          ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-          : 'bg-[#1c1c1e] text-gray-300'
+  useEffect(() => {
+    if (!txHash) return;
+    let canceled = false;
+
+    async function waitReceipt() {
+      try {
+        await waitForTransactionReceipt(config, {
+          hash: txHash as `0x${string}`,
+          chainId: mammothon.id,
+          confirmations: 1,
+        });
+        if (!canceled) {
+          setIsDeploying(false);
+          alert(`Deployment successful! Tx Hash: ${txHash}`);
+        }
+      } catch (err) {
+        console.error('Error waiting for receipt:', err);
+        if (!canceled) {
+          setIsDeploying(false);
+        }
       }
-    `;
+    }
+    waitReceipt();
+
+    return () => {
+      canceled = true;
+    };
+  }, [txHash]);
+
+  /**
+   * Close dropdown if user clicks outside
+   */
+  const handleClickOutside = (event: Event) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target as Node)
+    ) {
+      setIsOpen({});
+    }
   };
 
-  // Fee is disabled if immutable != 'False' OR ownership = 'Permissionless'
-  const isFeeDisabled =
-    formData.immutable !== 'False' || formData.ownership === 'Permissionless';
-
-  // For multiSig addresses
-  const isAddressDisabledForMultiSig = formData.ownership !== 'MultiSig';
-
-  // Safely handle progress
-  const validProgress = isNaN(progress) ? 0 : progress;
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside as EventListener);
+    return () => {
+      document.removeEventListener(
+        'mousedown',
+        handleClickOutside as EventListener,
+      );
+    };
+  }, []);
 
   return (
     <div>
@@ -539,7 +692,7 @@ export default function DeployPage() {
               <input
                 type='text'
                 placeholder='Enter name'
-                className={getInputClass(false)}
+                className='w-full rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none focus:ring-2 focus:ring-gray-600'
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 onBlur={() => handleFieldBlur('name')}
@@ -554,10 +707,10 @@ export default function DeployPage() {
               <label className='text-sm text-cyan-300'>Immutable</label>
               <div className='relative'>
                 <div
-                  className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300 transition-all duration-200 focus:ring-2 focus:ring-gray-600'
+                  className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300'
                   onClick={() => handleDropdownToggle('immutable')}
                   onBlur={() => handleFieldBlur('immutable')}
-                  tabIndex={0} // To allow onBlur to fire
+                  tabIndex={0}
                 >
                   {formData.immutable || 'Select immutable option'}
                 </div>
@@ -581,19 +734,19 @@ export default function DeployPage() {
                 </div>
                 {isOpen.immutable && (
                   <div className='absolute left-0 top-full z-10 mt-2 w-full rounded-xl border border-gray-700 bg-[#1c1c1e] shadow-lg'>
-                    {['True', 'False'].map((option) => (
+                    {['True', 'False'].map((opt) => (
                       <div
-                        key={option}
+                        key={opt}
                         className='cursor-pointer px-4 py-2 text-gray-300 hover:bg-gray-700'
                         onClick={() => {
-                          handleInputChange('immutable', option);
+                          handleInputChange('immutable', opt);
                           setTimeout(
                             () => handleDropdownToggle('immutable'),
                             100,
                           );
                         }}
                       >
-                        {option}
+                        {opt}
                       </div>
                     ))}
                   </div>
@@ -611,10 +764,10 @@ export default function DeployPage() {
               <label className='text-sm text-cyan-300'>Ownership</label>
               <div className='relative'>
                 <div
-                  className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300 transition-all duration-200 focus:ring-2 focus:ring-gray-600'
+                  className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300'
                   onClick={() => handleDropdownToggle('ownership')}
                   onBlur={() => handleFieldBlur('ownership')}
-                  tabIndex={0} // To allow onBlur to fire
+                  tabIndex={0}
                 >
                   {formData.ownership || 'Select ownership'}
                 </div>
@@ -638,19 +791,19 @@ export default function DeployPage() {
                 </div>
                 {isOpen.ownership && (
                   <div className='absolute left-0 top-full z-10 mt-2 w-full rounded-xl border border-gray-700 bg-[#1c1c1e] shadow-lg'>
-                    {['Single', 'MultiSig', 'Permissionless'].map((option) => (
+                    {['Single', 'MultiSig', 'Permissionless'].map((opt) => (
                       <div
-                        key={option}
+                        key={opt}
                         className='cursor-pointer px-4 py-2 text-gray-300 hover:bg-gray-700'
                         onClick={() => {
-                          handleInputChange('ownership', option);
+                          handleInputChange('ownership', opt);
                           setTimeout(
                             () => handleDropdownToggle('ownership'),
                             100,
                           );
                         }}
                       >
-                        {option}
+                        {opt}
                       </div>
                     ))}
                   </div>
@@ -663,7 +816,7 @@ export default function DeployPage() {
               )}
             </div>
 
-            {/* If Ownership = Single or Permissionless => singleAddress input */}
+            {/* If Single/Permissionless => singleAddress */}
             {(formData.ownership === 'Single' ||
               formData.ownership === 'Permissionless') && (
               <div className='relative flex flex-col gap-2'>
@@ -671,7 +824,7 @@ export default function DeployPage() {
                 <input
                   type='text'
                   placeholder='Enter owner address'
-                  className={getInputClass(false)}
+                  className='w-full rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none focus:ring-2 focus:ring-gray-600'
                   value={formData.singleAddress}
                   onChange={(e) =>
                     handleInputChange('singleAddress', e.target.value)
@@ -686,35 +839,34 @@ export default function DeployPage() {
               </div>
             )}
 
-            {/* If Ownership = MultiSig => multiple addresses + threshold */}
+            {/* If MultiSig => addresses + threshold */}
             {formData.ownership === 'MultiSig' && (
               <>
                 <div className='relative flex flex-col gap-2'>
                   <label className='text-sm text-cyan-300'>
                     Multi-Sig Addresses
                   </label>
-                  {formData.multiAddresses.map((addr, index) => (
-                    <div
-                      key={index}
-                      className='mb-2 flex items-center space-x-2'
-                    >
+                  {formData.multiAddresses.map((addr, idx) => (
+                    <div key={idx} className='mb-2 flex items-center space-x-2'>
                       <input
                         type='text'
-                        placeholder={`Address #${index + 1}`}
-                        className={getInputClass(
-                          !formData.ownership.includes('MultiSig'),
-                        )}
+                        placeholder={`Address #${idx + 1}`}
+                        className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
+                          formData.ownership !== 'MultiSig'
+                            ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                            : 'bg-[#1c1c1e] text-gray-300'
+                        }`}
                         value={addr}
                         onChange={(e) =>
-                          handleMultiAddressChange(index, e.target.value)
+                          handleMultiAddressChange(idx, e.target.value)
                         }
-                        onBlur={() => handleMultiAddressBlur(index)}
-                        disabled={isAddressDisabledForMultiSig}
+                        onBlur={() => handleMultiAddressBlur(idx)}
+                        disabled={formData.ownership !== 'MultiSig'}
                       />
                       <X
                         className='cursor-pointer text-gray-400'
                         size={18}
-                        onClick={() => removeMultiAddress(index)}
+                        onClick={() => removeMultiAddress(idx)}
                       />
                     </div>
                   ))}
@@ -722,14 +874,12 @@ export default function DeployPage() {
                     type='button'
                     className='w-full rounded-md bg-cyan-700 px-4 py-2 text-sm text-white hover:bg-cyan-800'
                     onClick={addMultiAddress}
-                    disabled={isAddressDisabledForMultiSig}
+                    disabled={formData.ownership !== 'MultiSig'}
                   >
                     + Add Address
                   </button>
-                  {/* Show any errors about multiAddresses (like "Address #2 is required") */}
                   {Array.isArray(errors.multiAddresses) &&
                     errors.multiAddresses.map((err, i) => {
-                      // Only show if that address has an error AND user has touched that address
                       if (!err) return null;
                       if (!shouldShowMultiAddressError(i)) return null;
                       return (
@@ -747,15 +897,17 @@ export default function DeployPage() {
                   <input
                     type='number'
                     placeholder='Enter threshold'
-                    className={getInputClass(
-                      !formData.ownership.includes('MultiSig'),
-                    )}
+                    className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
+                      formData.ownership !== 'MultiSig'
+                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                        : 'bg-[#1c1c1e] text-gray-300'
+                    }`}
                     value={formData.multiThreshold}
                     onChange={(e) =>
                       handleInputChange('multiThreshold', e.target.value)
                     }
                     onBlur={() => handleFieldBlur('multiThreshold')}
-                    disabled={isAddressDisabledForMultiSig}
+                    disabled={formData.ownership !== 'MultiSig'}
                   />
                   {shouldShowError('multiThreshold') &&
                     errors.multiThreshold && (
@@ -767,56 +919,92 @@ export default function DeployPage() {
               </>
             )}
 
-            {/* 4) Modification Fee (disabled unless immutable==='False' && ownership!=='Permissionless') */}
+            {/* 4) Fee */}
             <div className='relative flex flex-col gap-2'>
               <label className='text-sm text-cyan-300'>Modification Fee</label>
               <input
                 type='number'
                 placeholder='Enter modification fee'
-                className={getInputClass(isFeeDisabled)}
+                className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
+                  formData.immutable !== 'False' ||
+                  formData.ownership === 'Permissionless'
+                    ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                    : 'bg-[#1c1c1e] text-gray-300'
+                }`}
                 value={formData.fee}
                 onChange={(e) => handleInputChange('fee', e.target.value)}
                 onBlur={() => handleFieldBlur('fee')}
-                disabled={isFeeDisabled}
+                disabled={
+                  formData.immutable !== 'False' ||
+                  formData.ownership === 'Permissionless'
+                }
               />
               {shouldShowError('fee') && errors.fee && (
                 <p className='text-sm text-red-500'>{errors.fee as string}</p>
               )}
             </div>
 
-            {/* 5) Thumbnail */}
+            {/* 5) Thumbnail: default or custom */}
             <div className='relative flex flex-col gap-2'>
               <label className='text-sm text-cyan-300'>Thumbnail Image</label>
-              <div className='relative flex items-center space-x-2'>
+              <div className='flex items-center space-x-2'>
                 <input
-                  type='file'
-                  accept='image/png, image/jpeg'
-                  className='hidden'
-                  id='thumbnail'
-                  onChange={(e) =>
-                    handleInputChange('thumbnail', e.target.files?.[0] || null)
-                  }
-                  onBlur={() => handleFieldBlur('thumbnail')}
+                  type='checkbox'
+                  checked={useDefaultThumbnail}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setUseDefaultThumbnail(checked);
+                    if (checked) {
+                      // If checked => set default
+                      updateForm({
+                        ...formData,
+                        thumbnail: DEFAULT_THUMBNAIL_URL,
+                      });
+                    } else {
+                      // If unchecked => clear
+                      updateForm({ ...formData, thumbnail: '' });
+                    }
+                  }}
                 />
-                <label
-                  htmlFor='thumbnail'
-                  className={`flex w-[300px] cursor-pointer items-center justify-center rounded-xl ${
-                    formData.thumbnail ? 'bg-gray-800' : 'bg-[#1c1c1e]'
-                  } px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800`}
-                >
-                  <Upload size={18} className='mr-2' />
-                  {formData.thumbnail
-                    ? 'Thumbnail Selected'
-                    : 'Upload Thumbnail'}
-                </label>
-                {formData.thumbnail && (
-                  <X
-                    className='cursor-pointer text-gray-400'
-                    size={18}
-                    onClick={() => handleInputChange('thumbnail', null)}
-                  />
-                )}
+                <span className='text-sm text-cyan-300'>
+                  Use Default Thumbnail
+                </span>
               </div>
+              {!useDefaultThumbnail && (
+                <div className='relative flex items-center space-x-2'>
+                  <input
+                    type='file'
+                    accept='image/png, image/jpeg'
+                    className='hidden'
+                    id='thumbnailFile'
+                    onChange={(e) =>
+                      handleInputChange(
+                        'thumbnail',
+                        e.target.files?.[0] || null,
+                      )
+                    }
+                    onBlur={() => handleFieldBlur('thumbnail')}
+                  />
+                  <label
+                    htmlFor='thumbnailFile'
+                    className={`flex w-[300px] cursor-pointer items-center justify-center rounded-xl ${
+                      formData.thumbnail ? 'bg-gray-800' : 'bg-[#1c1c1e]'
+                    } px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800`}
+                  >
+                    <Upload size={18} className='mr-2' />
+                    {formData.thumbnail
+                      ? 'Thumbnail Selected'
+                      : 'Upload Thumbnail'}
+                  </label>
+                  {formData.thumbnail && (
+                    <X
+                      className='cursor-pointer text-gray-400'
+                      size={18}
+                      onClick={() => handleInputChange('thumbnail', null)}
+                    />
+                  )}
+                </div>
+              )}
               {shouldShowError('thumbnail') && errors.thumbnail && (
                 <p className='text-sm text-red-500'>
                   {errors.thumbnail as string}
@@ -826,7 +1014,13 @@ export default function DeployPage() {
 
             {/* 6) HTML File */}
             <div className='relative flex flex-col gap-2'>
-              <label className='text-sm text-cyan-300'>HTML File</label>
+              <label className='flex items-center gap-1 text-sm text-cyan-300'>
+                <span>HTML File</span>
+                <HelpCircle
+                  size={16}
+                  className='cursor-pointer text-gray-400 hover:text-gray-200'
+                />
+              </label>
               <div className='relative flex items-center space-x-2'>
                 <input
                   type='file'
@@ -866,23 +1060,31 @@ export default function DeployPage() {
 
             {/* Deploy button */}
             <button
-              className='w-full rounded-md bg-blue-500 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-600 disabled:bg-gray-500'
+              className='relative w-full rounded-md bg-blue-500 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-600 disabled:bg-gray-500'
               onClick={handleDeploy}
+              disabled={isDeploying || isPending}
             >
-              Deploy
+              {isDeploying && (
+                <span className='absolute left-5 top-1/2 -translate-y-1/2'>
+                  <Spinner />
+                </span>
+              )}
+              <span className={isDeploying ? 'ml-6' : ''}>
+                {isDeploying ? 'Deploying...' : 'Deploy'}
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Right: Planet Section with progress */}
+        {/* Right: Planet with progress ring */}
         <div className='relative flex w-full items-center justify-center md:w-1/2'>
           <div className='relative h-[500px] w-[500px]'>
-            <CircularProgress progress={validProgress} />
+            <CircularProgress progress={isNaN(progress) ? 0 : progress} />
             <Canvas className='absolute h-full w-full'>
               <ambientLight intensity={0.5} />
               <pointLight position={[10, 10, 10]} />
               <CustomStarsPlanet
-                radius={1 + (validProgress / 100) * 1.5}
+                radius={1 + (progress / 100) * 1.5}
                 starCount={3000}
                 rotationSpeed={0.02}
                 color1='#4A90E2'
