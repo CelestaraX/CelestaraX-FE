@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  MouseEvent,
+} from 'react';
 import { useQuery } from '@apollo/client';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Swiper as SwiperClass } from 'swiper/types';
 import { Navigation } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
@@ -16,6 +23,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
+
 import { useAccount, useWriteContract } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { simulateContract, waitForTransactionReceipt } from 'wagmi/actions';
@@ -26,9 +34,9 @@ import { PageCreated } from '@/types';
 import { config } from '@/wagmi'; // Example global wagmi config
 
 /**
- * Contract ABI for the "vote" function.
+ * The contract ABI for the "vote" function
  */
-const CONTRACT_ABI = [
+const VOTE_CONTRACT_ABI = [
   {
     constant: false,
     inputs: [
@@ -43,13 +51,13 @@ const CONTRACT_ABI = [
 ];
 
 /**
- * Contract address & RPC checks
+ * Contract address & RPC for the voting contract
  */
-const CONTRACT_ADDRESS = process.env
+const VOTE_CONTRACT_ADDRESS = process.env
   .NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 
-if (!CONTRACT_ADDRESS) {
+if (!VOTE_CONTRACT_ADDRESS) {
   throw new Error(
     'Missing NEXT_PUBLIC_CONTRACT_ADDRESS in environment variables',
   );
@@ -59,29 +67,74 @@ if (!RPC_URL) {
 }
 
 /**
+ * The contract ABI for fetching HTML by pageId
+ */
+import { JsonRpcProvider, Contract } from 'ethers';
+
+const FETCH_CONTRACT_ABI = [
+  {
+    constant: true,
+    inputs: [{ name: 'pageId', type: 'uint256' }],
+    name: 'getCurrentHtml',
+    outputs: [{ name: 'htmlContent', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+];
+
+/**
+ * Utility function to fetch HTML content from the on-chain contract
+ */
+export async function fetchPageDataFromContract(
+  pageId: string,
+): Promise<string> {
+  try {
+    const provider = new JsonRpcProvider(RPC_URL);
+    const contract = new Contract(
+      VOTE_CONTRACT_ADDRESS,
+      FETCH_CONTRACT_ABI,
+      provider,
+    );
+
+    console.log(`Fetching HTML from chain for pageId: ${pageId}`);
+    const htmlContent = await contract.getCurrentHtml(pageId);
+    console.log(`HTML fetched:`, htmlContent);
+    return htmlContent;
+  } catch (err) {
+    console.error(`Error fetching page data for pageId=${pageId}:`, err);
+    return '<p>Error loading content from blockchain</p>';
+  }
+}
+
+/**
  * Main Explorer page component.
  * Displays a list of pages (fetched via GraphQL),
- * renders HTML from subgraph data, and allows voting via on-chain transaction.
+ * fetches HTML content from the contract for the active page,
+ * and allows voting on each page.
  */
 export default function HtmlCardSlider() {
   /**
-   * 1) GraphQL query to fetch page data
+   * 1) Fetch page data from subgraph (except for actual HTML content).
    */
   const { data, loading, error, refetch } = useQuery<{ pages: PageCreated[] }>(
     GET_PAGE_CREATEDS,
   );
 
-  // Swiper instance & active slide index
+  // Swiper reference & active slide index
   const [swiperRef, setSwiperRef] = useState<SwiperClass | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Search query
+  // Local state for blockchain HTML
+  // We'll fetch it based on the currently active pageId.
+  const [blockchainHtml, setBlockchainHtml] = useState('<p>Loading...</p>');
+
+  // Basic search query for filtering
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Drawer state for showing page details
+  // Drawer state (right side panel)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Check if wallet is connected
+  // Wagmi account & connect modal
   const { isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
 
@@ -94,56 +147,56 @@ export default function HtmlCardSlider() {
   }, [searchQuery, allPages]);
 
   /**
-   * Local store for like/dislike counts to update instantly after voting
+   * We store local like/dislike counts for immediate UI updates after voting.
    */
   const [localVotes, setLocalVotes] = useState<{
     [pageId: string]: { totalLikes: number; totalDislikes: number };
   }>({});
 
-  // Sync localVotes with subgraph data
+  // Initialize localVotes from subgraph data
   useEffect(() => {
     if (filteredPages.length > 0) {
-      const updatedVotes: {
+      const updated: {
         [key: string]: { totalLikes: number; totalDislikes: number };
       } = {};
       filteredPages.forEach((page) => {
-        updatedVotes[page.pageId] = {
+        updated[page.pageId] = {
           totalLikes: page.totalLikes,
           totalDislikes: page.totalDislikes,
         };
       });
-      setLocalVotes((prev) => ({ ...prev, ...updatedVotes }));
+      setLocalVotes((prev) => ({ ...prev, ...updated }));
     }
   }, [filteredPages]);
 
   /**
-   * Track pending transaction state
+   * We'll keep track of a pending transaction for each vote to disable the button, etc.
    */
   const [pendingTxPageId, setPendingTxPageId] = useState<string | null>(null);
   const [pendingTxIsLike, setPendingTxIsLike] = useState<boolean | null>(null);
 
   /**
-   * wagmi's useWriteContract for sending transactions.
-   * We'll call writeContract(...) with the prepared request from simulateContract.
+   * useWriteContract for voting transactions
    */
   const {
     data: txData,
     isPending,
     writeContract,
-  } = useWriteContract({
-    config, // optional global config
-  });
+  } = useWriteContract({ config });
 
   /**
-   * handleVote: user clicks Like/Dislike
-   * 1) If not connected -> open wallet modal
-   * 2) If connected -> simulateContract -> writeContract
+   * handleVote -> user clicks "Like" or "Dislike"
+   * 1) If not connected, show wallet modal
+   * 2) If connected, simulate tx and write
    */
   const handleVote = useCallback(
     async (pageId: string, isLike: boolean) => {
       if (!isConnected) {
-        if (openConnectModal) openConnectModal();
-        else alert('Cannot open wallet modal for connection.');
+        if (openConnectModal) {
+          openConnectModal();
+        } else {
+          alert('Cannot open wallet modal for connection.');
+        }
         return;
       }
 
@@ -151,16 +204,16 @@ export default function HtmlCardSlider() {
         setPendingTxPageId(pageId);
         setPendingTxIsLike(isLike);
 
-        // Prepare transaction with simulateContract
+        // Prepare transaction
         const result = await simulateContract(config, {
           chainId: mainnet.id,
-          address: CONTRACT_ADDRESS,
-          abi: CONTRACT_ABI,
+          address: VOTE_CONTRACT_ADDRESS,
+          abi: VOTE_CONTRACT_ABI,
           functionName: 'vote',
-          args: [parseInt(pageId), isLike],
+          args: [parseInt(pageId, 10), isLike],
         });
 
-        // Send transaction using writeContract
+        // Broadcast transaction
         writeContract(
           {
             ...result.request,
@@ -172,7 +225,6 @@ export default function HtmlCardSlider() {
               setPendingTxIsLike(null);
             },
             onSuccess: () => {
-              // We'll update local state after the receipt is confirmed
               console.log('Transaction broadcast success');
             },
           },
@@ -187,32 +239,35 @@ export default function HtmlCardSlider() {
   );
 
   /**
-   * Wait for transaction receipt once txData?.hash is available
-   * Then update localVotes & refetch subgraph.
+   * Whenever we get a txData from useWriteContract (the tx hash),
+   * wait for the transaction receipt to confirm, then update local state.
    */
   useEffect(() => {
     if (!txData) return;
 
-    const waitReceipt = async () => {
+    const waitForReceipt = async () => {
       try {
         await waitForTransactionReceipt(config, {
-          hash: txData,
+          hash: txData, // in this scenario, txData is just the hash string
           chainId: mainnet.id,
           confirmations: 1,
         });
 
-        // Transaction is confirmed; update local UI
+        // If confirmed, update local UI
         if (pendingTxPageId && pendingTxIsLike !== null) {
           setLocalVotes((prev) => {
-            const current = prev[pendingTxPageId] || {
+            const curr = prev[pendingTxPageId] || {
               totalLikes: 0,
               totalDislikes: 0,
             };
-            let newLikes = current.totalLikes;
-            let newDislikes = current.totalDislikes;
+            let newLikes = curr.totalLikes;
+            let newDislikes = curr.totalDislikes;
 
-            if (pendingTxIsLike) newLikes += 1;
-            else newDislikes += 1;
+            if (pendingTxIsLike) {
+              newLikes += 1;
+            } else {
+              newDislikes += 1;
+            }
 
             return {
               ...prev,
@@ -227,7 +282,7 @@ export default function HtmlCardSlider() {
         // Optionally refetch subgraph data
         refetch();
 
-        // Reset states
+        // Reset
         setPendingTxPageId(null);
         setPendingTxIsLike(null);
       } catch (err) {
@@ -237,40 +292,63 @@ export default function HtmlCardSlider() {
       }
     };
 
-    waitReceipt();
+    waitForReceipt();
   }, [txData, pendingTxPageId, pendingTxIsLike, refetch]);
 
   /**
-   * Handle loading / error from subgraph
+   * Whenever the activeIndex (or filteredPages) changes,
+   * fetch the on-chain HTML for that pageId from the contract.
    */
-  if (loading)
-    return <div className='text-white'>Loading from subgraph...</div>;
-  if (error) return <div className='text-white'>Error: {error.message}</div>;
+  useEffect(() => {
+    if (filteredPages.length === 0) {
+      setBlockchainHtml('<p>No pages available</p>');
+      return;
+    }
+
+    const page = filteredPages[activeIndex];
+    if (!page) {
+      setBlockchainHtml('<p>Invalid page</p>');
+      return;
+    }
+
+    // Fetch HTML from contract
+    fetchPageDataFromContract(page.pageId).then((html) => {
+      setBlockchainHtml(html);
+    });
+  }, [filteredPages, activeIndex]);
 
   /**
-   * Toggle drawer for page details
+   * Handle subgraph loading/error states
+   */
+  if (loading) {
+    return <div className='text-white'>Loading from subgraph...</div>;
+  }
+  if (error) {
+    return <div className='text-white'>Error: {error.message}</div>;
+  }
+
+  /**
+   * Toggle the side drawer
    */
   const toggleDrawer = () => {
     setIsDrawerOpen((prev) => !prev);
   };
 
   /**
-   * Close drawer if user clicks overlay
+   * Close drawer if clicking the overlay
    */
-  const handleOverlayClick = (
-    e: React.MouseEvent<HTMLDivElement, MouseEvent>,
-  ) => {
+  const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).id === 'drawerOverlay') {
       setIsDrawerOpen(false);
     }
   };
 
-  // Current page from the swiper
+  // The currently active page
   const currentPage = filteredPages[activeIndex] || null;
 
   return (
     <div className='relative flex h-full w-full flex-col items-center justify-center gap-10'>
-      {/** 1. Search input */}
+      {/** Search input */}
       <div className='relative w-80'>
         <Search
           className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
@@ -285,7 +363,7 @@ export default function HtmlCardSlider() {
         />
       </div>
 
-      {/** Drawer toggle button */}
+      {/** Button to toggle the info drawer */}
       <motion.button
         className='flex items-center gap-1 rounded-md bg-gray-600 px-3 py-2 text-white hover:bg-gray-500'
         whileTap={{ scale: 0.9 }}
@@ -295,7 +373,7 @@ export default function HtmlCardSlider() {
         <span>Show Details</span>
       </motion.button>
 
-      {/** Swiper for page previews */}
+      {/** Swiper navigation */}
       <div className='flex w-full max-w-[1200px] items-center justify-between px-4'>
         <motion.button
           className='rounded-full bg-white/30 p-3 text-white transition hover:bg-white/50'
@@ -314,7 +392,7 @@ export default function HtmlCardSlider() {
           modules={[Navigation]}
           className='h-[700px] w-[600px] shadow-lg'
         >
-          {filteredPages.map((page, index) => (
+          {filteredPages.map((page) => (
             <SwiperSlide key={page.id}>
               <motion.div
                 className='flex h-full flex-col bg-white bg-opacity-[0.3] p-3 shadow-lg'
@@ -325,9 +403,14 @@ export default function HtmlCardSlider() {
                 <h2 className='mb-3 text-center text-lg font-bold text-black'>
                   PageId: {page.pageId}
                 </h2>
-                {activeIndex === index ? (
+
+                {/** Render HTML from contract for the active slide.
+                 *  If this slide is currently active, show the blockchainHtml.
+                 *  Otherwise, show a placeholder.
+                 */}
+                {currentPage && currentPage.pageId === page.pageId ? (
                   <iframe
-                    srcDoc={page.currentHtml}
+                    srcDoc={blockchainHtml}
                     className='h-full w-full flex-1 border-none bg-gray-100'
                     sandbox='allow-scripts allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox'
                   />
@@ -487,7 +570,7 @@ export default function HtmlCardSlider() {
 }
 
 /**
- * Example GET_PAGE_CREATEDS query.
+ * Example GET_PAGE_CREATEDS query for reference:
  *
  * import { gql } from '@apollo/client';
  * export const GET_PAGE_CREATEDS = gql`
