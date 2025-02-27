@@ -2,11 +2,11 @@
 <img src="public/celestarax.jpg" alt="Logo" width="250" height="100">
 </p>
 
-# CelestaraX: The Eternal On-Chain Page Hub
+# 🪐 CelestaraX: The Eternal On-Chain Page Hub
 
 **CelestaraX** is a next-generation platform for fully on-chain HTML pages, built on the **Celestia** Data Availability (DA) layer and powered by **Conduit G2**’s massive throughput. Traditional web hosting relies on centralized servers that can be shut down, censored, or lost over time. CelestaraX ensures that your pages live permanently on-chain—publicly verifiable, tamper-proof, and free from single points of failure. By embracing on-chain data rather than minimizing it, we enable a new era of transparent and decentralized publishing.
 
-## Key Features
+## 📌 Key Features
 
 ### `Web3ite` Smart Contract
 - Manages all on-chain data, including page creation, ownership, update requests, and fees.
@@ -50,7 +50,7 @@ sequenceDiagram
 3. Celestia stores the raw HTML data, ensuring public verification and censorship resistance.
 4. The front-end displays or updates the on-chain HTML content.
 
-## Example Use Case: On-Chain Million Dollar Page
+## Example Use Case: 💵 On-Chain Million Dollar Page 💵
 
 A decentralized advertising platform that leverages on-chain HTML and smart contract storage to create a fully transparent and unstoppable ad space.
 
@@ -178,7 +178,7 @@ To deploy manually using Foundry:
 ## Join the On-Chain Web
 CelestaraX transforms web hosting from centralized servers to unbreakable, on-chain data. By placing the Web3ite contract at its core and enabling diverse front-end implementations, we invite developers, creators, and communities to build, collaborate, and innovate in a world where HTML, ownership, and economics converge seamlessly on-chain.
 
-## Learn More
+## 🔍 Learn More
 - Contract Details: [CelestaraX/Contracts](https://github.com/CelestaraX/Contracts)
 - X: [@celestarax_](https://x.com/celestarax_)
 
