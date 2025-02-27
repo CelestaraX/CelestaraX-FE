@@ -20,3 +20,49 @@ export const GET_PAGE_CREATEDS = gql`
     }
   }
 `;
+
+export const GET_PAGE_UPDATES = gql`
+  query GetPageUpdates($pageId: String!) {
+    pages(where: { pageId: $pageId }) {
+      id
+      pageId
+      creator
+      name
+      thumbnail
+      ownershipType
+      updateFee
+      imt
+      currentHtml
+      totalLikes
+      totalDislikes
+      balance
+      multiSigOwners
+      multiSigThreshold
+      updateRequests {
+        requestId
+        requester
+      }
+    }
+  }
+`;
+
+export const GET_PAGES_BY_OWNER = gql`
+  query GetPagesByOwner($ownerAddress: String!) {
+    pages(where: { creator: $ownerAddress }) {
+      id
+      pageId
+      creator
+      name
+      thumbnail
+      ownershipType
+      updateFee
+      imt
+      currentHtml
+      totalLikes
+      totalDislikes
+      balance
+      multiSigOwners
+      multiSigThreshold
+    }
+  }
+`;
