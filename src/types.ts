@@ -24,8 +24,8 @@ export interface PageCreated {
   updateFee: string;
   imt: boolean;
   currentHtml: string;
-  totalLikes: number;
-  totalDislikes: number;
+  totalLikes: string;
+  totalDislikes: string;
   balance: string;
   multiSigOwners: string[] | null;
   multiSigThreshold: number | null;

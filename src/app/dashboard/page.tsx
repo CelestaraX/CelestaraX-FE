@@ -1,155 +1,59 @@
 'use client';
-import Header from '@/components/layout/Header';
-import { Planet } from './_components/Planet';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@apollo/client';
+import { useAccount } from 'wagmi';
 import { Canvas } from '@react-three/fiber';
-import React, { useState } from 'react';
+import { Planet } from './_components/Planet'; // Adjust import path
+import Header from '@/components/layout/Header'; // Adjust import path
 
-const allHtmlFiles = [
-  {
-    rank: 1,
-    name: 'Worm Game',
-    id: '0x123abc',
-    date: '2024-02-25',
-    like: 120,
-    unlike: 3,
-    html: `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"/><title>worm game</title><style>html,body{margin:0;padding:0;text-align:center;background:#f0f0f0;height:100%}#game{background:#000;display:block;margin:20px auto;border:2px solid #555;display:block}#gameover-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;font-family:sans-serif;font-size:24px;display:none}#overlay-content{background:#222;padding:20px 40px;border-radius:8px;text-align:center}#overlay-content button{margin-top:20px;padding:10px 20px;font-size:18px;cursor:pointer;border:none;border-radius:4px;background:#ff5555;color:#fff}</style></head><body><canvas id="game" width="400" height="400"></canvas><div id="gameover-overlay"><div id="overlay-content"><div id="gameover-text">Game Over!</div><div id="score-text">Score: <span id="final-score">0</span></div><button id="retry-btn">Retry</button></div></div><script>const canvas=document.getElementById("game");const ctx=canvas.getContext("2d");const gridSize=20;const tileCount=canvas.width/gridSize;const gameOverOverlay=document.getElementById("gameover-overlay");const finalScoreSpan=document.getElementById("final-score");const retryButton=document.getElementById("retry-btn");let snake,vx,vy,food,score,gameOver;function initGame(){snake=[{x:10,y:10}];vx=1;vy=0;score=0;food={x:15,y:15};gameOver=false;gameOverOverlay.style.display="none"}document.addEventListener("keydown",(e)=>{if(gameOver)return;switch(e.keyCode){case 37:if(vx!==1){vx=-1;vy=0}break;case 38:if(vy!==1){vx=0;vy=-1}break;case 39:if(vx!==-1){vx=1;vy=0}break;case 40:if(vy!==-1){vx=0;vy=1}break}});function gameLoop(){if(gameOver)return;const head={x:snake[0].x+vx,y:snake[0].y+vy};if(head.x<0||head.x>=tileCount||head.y<0||head.y>=tileCount){showGameOver();return}snake.unshift(head);for(let i=1;i<snake.length;i++){if(snake[i].x===head.x&&snake[i].y===head.y){showGameOver();return}}if(head.x===food.x&&head.y===food.y){score++;food.x=Math.floor(Math.random()*tileCount);food.y=Math.floor(Math.random()*tileCount)}else{snake.pop()}ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="lime";snake.forEach(part=>{ctx.fillRect(part.x*gridSize,part.y*gridSize,gridSize,gridSize)});ctx.fillStyle="red";ctx.fillRect(food.x*gridSize,food.y*gridSize,gridSize,gridSize)}function showGameOver(){gameOver=true;finalScoreSpan.textContent=score;gameOverOverlay.style.display="flex"}retryButton.addEventListener("click",()=>{initGame()});initGame();setInterval(gameLoop,100);</script></body></html>`,
-  },
-  {
-    rank: 2,
-    name: 'Worm Game',
-    id: '0x123abc3',
-    date: '2024-02-25',
-    like: 120,
-    unlike: 3,
-    html: `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Space Adventure</title><style>body{margin:0;padding:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;user-select:none}h1{margin-top:20px}#gameCanvas{background:#111;border:2px solid #fff;display:block;margin:10px auto 0 auto}#scoreBoard{margin:0 auto;text-align:center;margin-top:10px;margin-bottom:10px}#scoreBoard span{margin:0 20px}</style></head><body><h1>Space Adventure</h1><div id="scoreBoard"><span>Score: <span id="score">0</span></span><span>Health: <span id="health">5</span></span></div><canvas id="gameCanvas" width="600" height="400"></canvas><script>const canvas=document.getElementById("gameCanvas");const ctx=canvas.getContext("2d");const scoreSpan=document.getElementById("score");const healthSpan=document.getElementById("health");const WIDTH=canvas.width;const HEIGHT=canvas.height;let player={x:WIDTH/2,y:HEIGHT-60,size:20,speed:4};let score=0;let health=5;let gameOver=false;let stars=[];let asteroids=[];let keys={};function initObjects(){for(let i=0;i<10;i++){stars.push({x:Math.random()*(WIDTH-20)+10,y:Math.random()*(HEIGHT-100)+50,size:5});}for(let i=0;i<5;i++){asteroids.push({x:Math.random()*(WIDTH-30)+15,y:Math.random()*(HEIGHT/2),size:15,speed:1+Math.random()*2});}}document.addEventListener("keydown",(e)=>{keys[e.key]=true;});document.addEventListener("keyup",(e)=>{keys[e.key]=false;});function update(){if(gameOver)return;if(keys["ArrowLeft"]){player.x-=player.speed;}if(keys["ArrowRight"]){player.x+=player.speed;}if(keys["ArrowUp"]){player.y-=player.speed;}if(keys["ArrowDown"]){player.y+=player.speed;}if(player.x<0){player.x=0;}if(player.x>WIDTH-player.size){player.x=WIDTH-player.size;}if(player.y<0){player.y=0;}if(player.y>HEIGHT-player.size){player.y=HEIGHT-player.size;}for(let i=0;i<stars.length;i++){if(checkCollision(player.x,player.y,player.size,stars[i].x,stars[i].y,stars[i].size)){score++;scoreSpan.textContent=score;stars[i].x=Math.random()*(WIDTH-20)+10;stars[i].y=Math.random()*(HEIGHT-100)+50;}}for(let i=0;i<asteroids.length;i++){asteroids[i].y+=asteroids[i].speed;if(checkCollision(player.x,player.y,player.size,asteroids[i].x,asteroids[i].y,asteroids[i].size)){health--;healthSpan.textContent=health;asteroids[i].x=Math.random()*(WIDTH-30)+15;asteroids[i].y=-20;}if(asteroids[i].y>HEIGHT+20){asteroids[i].x=Math.random()*(WIDTH-30)+15;asteroids[i].y=-20;}}if(health<=0){gameOver=true;}}function checkCollision(x1,y1,size1,x2,y2,size2){let distX=x1-x2;let distY=y1-y2;let distance=Math.sqrt(distX*distX+distY*distY);return distance<(size1/2+size2/2);}function draw(){ctx.clearRect(0,0,WIDTH,HEIGHT);ctx.fillStyle="lime";ctx.beginPath();ctx.arc(player.x,player.y,player.size/2,0,Math.PI*2);ctx.fill();ctx.fillStyle="yellow";stars.forEach(star=>{ctx.beginPath();ctx.arc(star.x,star.y,star.size/2,0,Math.PI*2);ctx.fill();});ctx.fillStyle="grey";asteroids.forEach(ast=>{ctx.beginPath();ctx.arc(ast.x,ast.y,ast.size/2,0,Math.PI*2);ctx.fill();});if(gameOver){ctx.fillStyle="red";ctx.font="40px Arial";let gameOverText="GAME OVER";let gameOverMetrics=ctx.measureText(gameOverText);ctx.fillText(gameOverText,(WIDTH-gameOverMetrics.width)/2,HEIGHT/2);ctx.font="20px Arial";ctx.fillStyle="white";let restartText="Refresh (F5) to restart!";let restartMetrics=ctx.measureText(restartText);ctx.fillText(restartText,(WIDTH-restartMetrics.width)/2,(HEIGHT/2)+40);}}function gameLoop(){update();draw();requestAnimationFrame(gameLoop);}initObjects();gameLoop();</script></body></html>    `,
-  },
-];
+import { GET_PAGES_BY_OWNER, GET_PAGE_UPDATES } from '@/lib/graphql/queries'; // Adjust path
+import {
+  fetchPageDataFromContract,
+  fetchUpdateRequestFromContract,
+} from '@/lib/blockchain'; // The code from blockchain.ts
+import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
+import { PageCreated } from '@/types';
 
-const Mypage = () => {
-  const [selectedHtml, setSelectedHtml] = useState<string | null>(null);
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const selectedFile = selectedFileId
-    ? generatePlanetAttributes(selectedFileId)
-    : null;
+/**
+ * Example type for updateRequests
+ */
+interface UpdateRequestSubgraph {
+  requestId: string;
+  requester: string;
+}
 
-  function generatePlanetAttributes(id: string) {
-    const hashCode = (str: string) => {
-      return str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    };
-    const numericId = hashCode(id);
-    return {
-      color: `#${((numericId * 9973) % 0xffffff).toString(16).padStart(6, '0')}`,
-      planetSize: (numericId % 6) + 3,
-      rotationSpeed: (numericId % 5) * 0.3 + 0.5,
-    };
+/**
+ * Helper function to parse ownershipType => "Single", "MultiSig", "Permissionless".
+ * If subgraph returns numeric values 0,1,2, we convert accordingly.
+ */
+function parseOwnershipType(value?: number) {
+  switch (value) {
+    case 0:
+      return 'Single';
+    case 1:
+      return 'MultiSig';
+    case 2:
+      return 'Permissionless';
+    default:
+      return String(value);
   }
+}
 
-  return (
-    <div>
-      <Header />
-      <main className='flex h-[calc(100vh-100px)] flex-col items-center justify-center'>
-        <div className='relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-2 border-pink-500 p-4 text-pink-500'>
-          {/* 좌측 막대 그래프 */}
-          <div className='absolute left-4 top-16 w-[150]'>
-            <StatBar label='STARS' color='bg-pink-500' value={20} max={100} />
-            <StatBar label='PROOFS' color='bg-blue-400' value={50} max={100} />
-            <StatBar label='CYCLES' color='bg-blue-400' value={30} max={100} />
-            <div className='mt-10 h-full w-full'>
-              <Canvas>
-                <ambientLight intensity={1.5} />
-                <pointLight position={[10, 10, 10]} />
-                {selectedFile && (
-                  <Planet
-                    key={selectedFileId}
-                    rotationSpeed={selectedFile.rotationSpeed}
-                    planetSize={2.5}
-                    geometries={5}
-                    color={selectedFile.color}
-                  />
-                )}
-              </Canvas>
-            </div>
-            <div>#ID: 0x003818913</div>
-          </div>
+/**
+ * Safe parse string to number
+ */
+function safeNum(val?: string | null) {
+  if (!val) return 0;
+  const n = parseInt(val, 10);
+  return isNaN(n) ? 0 : n;
+}
 
-          {/* 우측 정보 */}
-          <div className='absolute right-4 top-16 text-sm'>
-            <div>3302.3 MHz</div>
-            <div>PREVIEW: 20.985</div>
-            <div>
-              BALANCE REMAINING: <span className='text-white'>0.00 USDC</span>
-            </div>
-          </div>
-          <div className='mb-10 flex h-[600px] w-[600px] max-w-4xl items-center justify-center overflow-hidden border border-pink-500 bg-white'>
-            {selectedHtml ? (
-              <iframe className='h-full w-full' srcDoc={selectedHtml} />
-            ) : (
-              <span className='text-pink-500'>Click on a file to preview</span>
-            )}
-          </div>
-          <div className='mt-6 flex w-full max-w-6xl space-x-6'>
-            {/* ✅ 왼쪽 - 내가 배포한 HTML 리스트 */}
-            <div className='flex-1 border border-pink-500 p-4'>
-              <h2 className='mb-3 text-lg font-bold text-pink-500'>
-                📂 My Deployments
-              </h2>
-
-              {/* 🔹 테이블 */}
-              <table className='w-full border-collapse'>
-                <thead>
-                  <tr className='border-b border-pink-500 text-pink-300'>
-                    <th className='p-2 text-left'>Rank</th>
-                    <th className='p-2 text-left'>Name</th>
-                    <th className='p-2 text-left'>ID</th>
-                    <th className='p-2 text-left'>Date</th>
-                    <th className='p-2 text-left'>👍</th>
-                    <th className='p-2 text-left'>👎</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allHtmlFiles.map((file) => (
-                    <tr
-                      key={file.id}
-                      className='cursor-pointer border-b border-gray-700 hover:bg-gray-800'
-                      onClick={() => {
-                        setSelectedHtml(file.html);
-                        setSelectedFileId(file.id);
-                      }}
-                    >
-                      <td className='p-2'>{file.rank}</td>
-                      <td className='p-2 text-cyan-300'>{file.name}</td>
-                      <td className='p-2'>{file.id}</td>
-                      <td className='p-2'>{file.date}</td>
-                      <td className='p-2 text-green-400'>{file.like}</td>
-                      <td className='p-2 text-red-400'>{file.unlike}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ✅ 오른쪽 - 요청 리스트 */}
-            <div className='w-[300px] border border-pink-500 p-4'>
-              <h2 className='mb-3 text-lg font-bold text-pink-500'>
-                📬 Requests
-              </h2>
-              <ul className='space-y-2'>
-                <li className='flex justify-between text-cyan-300'>
-                  <span>@crypto_fan</span>
-                  <span className='text-sm text-gray-400'>2 hours ago</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default Mypage;
-
-function StatBar({
+/**
+ * StatBar component
+ */
+export function StatBar({
   label,
   color,
   value,
@@ -162,13 +66,467 @@ function StatBar({
 }) {
   return (
     <div className='mb-2'>
-      <div className='mb-1 text-xs'>{label}:</div>
-      <div className='relative h-4 w-40 border border-pink-500'>
+      <div className='mb-1 text-xs font-bold text-white'>{label}:</div>
+      <div className='relative h-4 w-40 overflow-hidden rounded border border-pink-500'>
         <div
-          className={`${color} h-full`}
+          className={`${color} h-full transition-all duration-300`}
           style={{ width: `${(value / max) * 100}%` }}
-        ></div>
+        />
       </div>
+      <div className='text-xs text-gray-400'>
+        {value} / {max}
+      </div>
+    </div>
+  );
+}
+
+export default function Mypage() {
+  const { address } = useAccount();
+
+  // 1) Query to fetch "My Deployments" => GET_PAGES_BY_OWNER
+  const {
+    data: myDeploymentsData,
+    loading: myDeploymentsLoading,
+    error: myDeploymentsError,
+  } = useQuery<{ pages: PageCreated[] }>(GET_PAGES_BY_OWNER, {
+    variables: { ownerAddress: address?.toLowerCase() || '' },
+    skip: !address, // skip if not connected
+  });
+
+  // Local states
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [selectedHtml, setSelectedHtml] = useState<string | null>(null);
+
+  // 2) Query to fetch "Requests" => GET_PAGE_UPDATES
+  const {
+    data: requestsData,
+    loading: requestsLoading,
+    error: requestsError,
+  } = useQuery<{
+    pages: (PageCreated & { updateRequests: UpdateRequestSubgraph[] })[];
+  }>(GET_PAGE_UPDATES, {
+    variables: { pageId: selectedPageId || '' },
+    skip: !selectedPageId,
+  });
+
+  /**
+   * The selected page from "My Deployments"
+   */
+  const selectedPage = useMemo(() => {
+    if (!myDeploymentsData?.pages || !selectedPageId) return null;
+    return myDeploymentsData.pages.find((p) => p.pageId === selectedPageId);
+  }, [myDeploymentsData, selectedPageId]);
+
+  /**
+   * When user clicks a row in "My Deployments," fetch HTML from contract
+   * and store it in selectedHtml.
+   */
+  useEffect(() => {
+    if (!selectedPageId) {
+      setSelectedHtml(null);
+      return;
+    }
+    fetchPageDataFromContract(selectedPageId).then((html) => {
+      setSelectedHtml(html);
+    });
+  }, [selectedPageId]);
+
+  /**
+   * Generate planet attributes based on pageId (sample logic)
+   */
+  function generatePlanetAttributes(id: string) {
+    const hashCode = (str: string) => {
+      return str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    };
+    const numericId = hashCode(id);
+    return {
+      color: `#${((numericId * 9973) % 0xffffff).toString(16).padStart(6, '0')}`,
+      planetSize: (numericId % 6) + 2,
+      rotationSpeed: (numericId % 5) * 0.3 + 0.5,
+    };
+  }
+  const selectedFile = selectedPageId
+    ? generatePlanetAttributes(selectedPageId)
+    : null;
+
+  // For "Requests" => handle modal
+  const [showRequestModal, setShowRequestModal] = useState(false);
+
+  // The data for the chosen request from chain
+  const [requestData, setRequestData] = useState<{
+    newName: string;
+    newThumbnail: string;
+    newHtml: string;
+    executed: boolean;
+    approvalCount: string;
+  } | null>(null);
+
+  /**
+   * "Requests" column => user clicks => open modal
+   * We'll fetch the new data from chain by (pageId, requestId)
+   */
+  const handleRequestClick = async (requestId: string) => {
+    setShowRequestModal(true);
+
+    if (!selectedPageId) return;
+
+    const data = await fetchUpdateRequestFromContract(
+      selectedPageId,
+      requestId,
+    );
+    if (data) setRequestData(data);
+  };
+
+  /**
+   * close modal
+   */
+  const closeModal = () => {
+    setShowRequestModal(false);
+    setRequestData(null);
+  };
+
+  // ----------------------------------------------------------------
+  // [FIX] We define isImmutableOrPerm as a normal variable instead of using a Hook,
+  // to avoid "React Hook is called conditionally" error.
+  // ----------------------------------------------------------------
+  const isImmutableOrPerm = (() => {
+    if (!selectedPage) return false;
+    // ownershipType is number => 2 means Permissionless
+    const ownerNum = selectedPage.ownershipType ?? -1;
+    const isPerm = ownerNum === 2;
+    // immutable flag
+    const isImm = selectedPage.imt ?? false;
+    return isPerm || isImm;
+  })();
+
+  // Loading / error states. We put them AFTER all Hook definitions to avoid early returns
+  if (myDeploymentsLoading) {
+    return (
+      <div>
+        <Header />
+        <main className='flex h-screen items-center justify-center text-white'>
+          Loading your deployments...
+        </main>
+      </div>
+    );
+  }
+  if (myDeploymentsError) {
+    return (
+      <div>
+        <Header />
+        <main className='flex h-screen items-center justify-center text-red-500'>
+          Error: {myDeploymentsError.message}
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Header />
+      <main className='flex h-[calc(100vh-100px)] flex-col items-center justify-center bg-black'>
+        <div className='relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-2 border-pink-500 p-4 text-pink-500'>
+          {/* Left stats + planet */}
+          <div className='absolute left-4 top-16 w-[150px] space-y-4'>
+            {/* Example: Show totalLikes, totalDislikes, etc. from selected page */}
+            <StatBar
+              label='Likes'
+              color='bg-pink-500'
+              value={selectedPage ? safeNum(selectedPage.totalLikes) : 0}
+              max={100} // arbitrary
+            />
+            <StatBar
+              label='Dislikes'
+              color='bg-blue-400'
+              value={selectedPage ? safeNum(selectedPage.totalDislikes) : 0}
+              max={100}
+            />
+            <StatBar
+              label='Update Fee'
+              color='bg-green-600'
+              value={selectedPage ? safeNum(selectedPage.updateFee) : 0}
+              max={10000} // arbitrary
+            />
+
+            {/* 3D Planet */}
+            <div className='mt-6 h-48 w-full'>
+              <Canvas>
+                <ambientLight intensity={0.8} />
+                <pointLight position={[10, 10, 10]} />
+                {selectedFile && (
+                  <Planet
+                    key={selectedPageId}
+                    rotationSpeed={selectedFile.rotationSpeed}
+                    planetSize={selectedFile.planetSize}
+                    geometries={5}
+                    color={selectedFile.color}
+                  />
+                )}
+              </Canvas>
+            </div>
+
+            {/* ID or something */}
+            <div className='mt-2 text-xs text-white'>
+              {selectedPageId ? `#ID: ${selectedPageId}` : '#ID: N/A'}
+            </div>
+          </div>
+
+          {/* Right info panel - for example, ownershipType, balance, owners, etc. */}
+          <div className='absolute right-4 top-16 flex w-[200px] flex-col gap-2 text-sm text-white'>
+            <div className='font-bold text-pink-300'>Ownership</div>
+            <div>
+              Type:&nbsp;
+              {selectedPage
+                ? parseOwnershipType(selectedPage.ownershipType)
+                : '--'}
+            </div>
+            <div>Threshold: {selectedPage?.multiSigThreshold ?? '--'}</div>
+            <div className='border-b border-pink-500 pb-2' />
+
+            <div className='font-bold text-pink-300'>Balance</div>
+            <div className='mb-2'>
+              BALANCE REMAINING:{' '}
+              <span className='text-green-400'>
+                {selectedPage?.balance ?? '0'} wei
+              </span>
+            </div>
+
+            <div className='font-bold text-pink-300'>Owners</div>
+            {selectedPage?.multiSigOwners &&
+            selectedPage.multiSigOwners.length > 0 ? (
+              <ul className='ml-4 list-disc text-xs'>
+                {selectedPage.multiSigOwners.map((owner, idx) => (
+                  <li key={idx}>{owner}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className='text-xs'>No owners (maybe permissionless?)</div>
+            )}
+          </div>
+
+          {/* Middle: iframe preview */}
+          <div className='mb-10 flex h-[600px] w-[600px] max-w-4xl items-center justify-center overflow-hidden border border-pink-500 bg-white'>
+            {selectedHtml ? (
+              <iframe className='h-full w-full' srcDoc={selectedHtml} />
+            ) : (
+              <span className='text-pink-500'>Select a page to preview</span>
+            )}
+          </div>
+
+          {/* Bottom: My Deployments + Requests */}
+          <div className='mt-6 flex w-full max-w-6xl space-x-6'>
+            {/* Left - My Deployments with new columns */}
+            <div className='flex-1 border border-pink-500 p-4'>
+              <h2 className='mb-3 text-lg font-bold text-pink-500'>
+                My Deployments
+              </h2>
+              {myDeploymentsData?.pages?.length === 0 && (
+                <p className='text-sm text-gray-300'>
+                  No pages found for your address.
+                </p>
+              )}
+              <table className='w-full border-collapse'>
+                <thead>
+                  <tr className='border-b border-pink-500 text-pink-300'>
+                    <th className='p-2 text-left'>Name</th>
+                    <th className='p-2 text-left'>PageId</th>
+                    {/* Ownership + Immutable */}
+                    <th className='p-2 text-left'>Ownership</th>
+                    <th className='p-2 text-left'>Immutable</th>
+                    {/* Likes, Dislikes */}
+                    <th className='p-2 text-left'>Likes</th>
+                    <th className='p-2 text-left'>Dislikes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {myDeploymentsData?.pages?.map((page) => {
+                    const ownershipStr = parseOwnershipType(page.ownershipType);
+                    return (
+                      <tr
+                        key={page.id}
+                        className='cursor-pointer border-b border-gray-700 hover:bg-gray-800'
+                        onClick={() => {
+                          setSelectedPageId(page.pageId);
+                        }}
+                      >
+                        <td className='p-2 text-cyan-300'>{page.name}</td>
+                        <td className='p-2'>{page.pageId}</td>
+                        <td className='p-2'>{ownershipStr}</td>
+                        <td className='p-2'>{page.imt ? 'True' : 'False'}</td>
+                        <td className='p-2 text-green-400'>
+                          {safeNum(page.totalLikes)}
+                        </td>
+                        <td className='p-2 text-red-400'>
+                          {safeNum(page.totalDislikes)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Right - Requests */}
+            <div className='w-[300px] border border-pink-500 p-4'>
+              <h2 className='mb-3 text-lg font-bold text-pink-500'>Requests</h2>
+
+              {/* If selected page is immutable or permissionless => show special message */}
+              {selectedPage && isImmutableOrPerm && (
+                <div className='text-sm text-gray-300'>
+                  {parseOwnershipType(selectedPage.ownershipType) ===
+                  'Permissionless'
+                    ? 'This page is Permissionless. Updates do not require requests, or it cannot be updated in a controlled manner.'
+                    : 'This page is Immutable. No modification allowed.'}
+                </div>
+              )}
+
+              {/* If user hasn't chosen a page yet */}
+              {!selectedPageId && (
+                <div className='text-sm text-gray-300'>
+                  Select a page to see requests
+                </div>
+              )}
+
+              {/* If the page is updatable, show requests data */}
+              {!isImmutableOrPerm && selectedPageId && (
+                <>
+                  {requestsLoading && (
+                    <div className='text-sm text-gray-300'>
+                      Loading requests...
+                    </div>
+                  )}
+                  {requestsError && (
+                    <div className='text-sm text-red-400'>
+                      Error: {requestsError.message}
+                    </div>
+                  )}
+
+                  {requestsData?.pages && requestsData.pages.length > 0 ? (
+                    <>
+                      {requestsData.pages[0].updateRequests.length === 0 ? (
+                        <p className='text-sm text-gray-400'>
+                          No update requests found.
+                        </p>
+                      ) : (
+                        <ul className='space-y-2'>
+                          {requestsData.pages[0].updateRequests.map((req) => (
+                            <li
+                              key={req.requestId}
+                              className='flex cursor-pointer justify-between border-b border-gray-700 py-1 text-cyan-300 hover:bg-gray-800'
+                              onClick={() => handleRequestClick(req.requestId)}
+                            >
+                              {/* columns: name, id, requestId, requester */}
+                              <div>
+                                <div className='text-sm'>
+                                  Name: {requestsData.pages[0].name || 'N/A'}
+                                </div>
+                                <div className='text-xs text-gray-400'>
+                                  PageId: {requestsData.pages[0].pageId}
+                                </div>
+                              </div>
+                              <div className='text-right text-xs text-gray-300'>
+                                <div>ReqID: {req.requestId}</div>
+                                <div>By: {req.requester}</div>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <p className='text-sm text-gray-300'>
+                      No requests to show.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Modal for a single request: left=old data, right=new data */}
+      <AnimatePresence>
+        {showRequestModal && selectedPageId && selectedPage && requestData && (
+          <motion.div
+            className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4'
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeModal}
+          >
+            <motion.div
+              className='relative w-full max-w-4xl rounded bg-gray-900 p-6 text-white shadow-2xl'
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              onClick={(e) => e.stopPropagation()} // prevent closing
+            >
+              <button
+                onClick={closeModal}
+                className='absolute right-8 top-8 rounded bg-gray-700 p-1 text-gray-200 hover:bg-gray-600'
+              >
+                <X size={18} />
+              </button>
+              <h2 className='mb-4 text-2xl font-bold text-pink-300'>
+                Update Request
+              </h2>
+
+              <div className='grid grid-cols-2 gap-6'>
+                {/* Left: existing data */}
+                <div className='border-r border-gray-700 pr-4'>
+                  <h3 className='mb-2 text-pink-400'>Current Page Info</h3>
+                  <div className='space-y-1 text-sm'>
+                    <div>Page Name: {selectedPage.name}</div>
+                    <div>
+                      Thumbnail: {selectedPage.thumbnail?.slice(0, 40) + '...'}
+                    </div>
+                    <div>
+                      Ownership:{' '}
+                      {parseOwnershipType(selectedPage.ownershipType)}
+                    </div>
+                    <div>Balance: {selectedPage.balance}</div>
+                    <div>Current Likes: {selectedPage.totalLikes}</div>
+                    <div>Current Dislikes: {selectedPage.totalDislikes}</div>
+                  </div>
+                  <div className='mt-4 text-sm text-gray-400'>
+                    Existing HTML Preview:
+                  </div>
+                  <div className='mt-2 h-32 overflow-auto rounded bg-gray-800 p-2 text-xs'>
+                    {selectedHtml
+                      ? selectedHtml.substring(0, 300) +
+                        (selectedHtml.length > 300 ? '...' : '')
+                      : 'N/A'}
+                  </div>
+                </div>
+
+                {/* Right: new update data */}
+                <div>
+                  <h3 className='mb-2 text-pink-400'>Proposed Changes</h3>
+                  <div className='space-y-1 text-sm'>
+                    <div>New Name: {requestData.newName || 'N/A'}</div>
+                    <div>
+                      New Thumbnail:{' '}
+                      {requestData.newThumbnail.slice(0, 40) + '...'}
+                    </div>
+                    <div>Executed: {requestData.executed ? 'Yes' : 'No'}</div>
+                    <div>Approvals: {requestData.approvalCount}</div>
+                  </div>
+                  <div className='mt-4 text-sm text-gray-400'>
+                    Proposed HTML Preview:
+                  </div>
+                  <div className='mt-2 h-32 overflow-auto rounded bg-gray-800 p-2 text-xs'>
+                    {requestData.newHtml
+                      ? requestData.newHtml.substring(0, 300) +
+                        (requestData.newHtml.length > 300 ? '...' : '')
+                      : 'N/A'}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
