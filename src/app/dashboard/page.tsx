@@ -537,9 +537,10 @@ export default function Mypage() {
                                 </div>
                                 <div>ReqID: {req.requestId}</div>
                                 <div
-                                  onClick={() =>
-                                    copyTxToClipboard(req.requester)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyTxToClipboard(req.requester);
+                                  }}
                                   className='flex gap-2 pb-1'
                                 >
                                   By: {shortenAddress(req.requester)}
@@ -640,6 +641,9 @@ export default function Mypage() {
                   <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
                     {requestData.newHtml}
                   </div>
+                  <button className='text-md ml-[370px] mt-4 h-[45px] w-[100px] rounded-md bg-gray-700 font-mono font-semibold text-gray-200 hover:bg-gray-600'>
+                    Approve
+                  </button>
                 </div>
               </div>
             </motion.div>
