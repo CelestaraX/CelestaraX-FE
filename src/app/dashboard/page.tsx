@@ -114,6 +114,7 @@ export default function Mypage() {
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedHtml, setSelectedHtml] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedTx, setCopiedTx] = useState<string>('');
 
   // 4) Query to fetch "Requests" => GET_PAGE_UPDATES
   const {
@@ -269,15 +270,23 @@ export default function Mypage() {
     setTimeout(() => setCopiedIndex(null), 1500); // 1.5초 후 원래 상태로
   };
 
+  // 클립보드 복사 함수
+  const copyTxToClipboard = (tx: string) => {
+    navigator.clipboard.writeText(tx);
+    setCopiedTx(tx);
+    toast.success('Transaction copied!'); // 사용자 피드백 (선택 사항)
+    setTimeout(() => setCopiedTx(''), 1500); // 1.5초 후 원래 상태로
+  };
+
   return (
     <div className='min-h-screen'>
       <Header />
       <main className='text-neon-pink flex h-[calc(100vh-100px)] flex-col items-center justify-center font-mono'>
         <div className='border-neon-pink relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-[3px] p-4 shadow-[0_0_20px_rgba(255,0,255,0.5)]'>
           {/* Left area: Planet + Rank / Likes / Dislikes */}
-          <div className='absolute left-4 top-16 w-[150px] text-white'>
+          <div className='absolute left-9 top-[75px] flex h-[250px] w-[200px] flex-col pl-5 text-white'>
             {/* Planet 3D */}
-            <div className='h-48 w-full border border-pink-500 p-2'>
+            <div className='h-full w-full border border-pink-500 p-2'>
               <Canvas>
                 <ambientLight intensity={20} />
                 <pointLight position={[10, 10, 10]} />
@@ -324,7 +333,7 @@ export default function Mypage() {
           </div>
 
           {/* Right info panel */}
-          <div className='absolute right-4 top-16 flex w-[200px] flex-col gap-2 text-sm text-white'>
+          <div className='absolute right-10 top-16 flex w-[200px] flex-col gap-2 text-sm text-white'>
             <div className='text-neon-pink font-bold'>Ownership</div>
             <div>
               Type:{' '}
@@ -514,20 +523,35 @@ export default function Mypage() {
                           {requestsData.pages[0].updateRequests.map((req) => (
                             <li
                               key={req.requestId}
-                              className='flex cursor-pointer justify-between border-b border-gray-700 py-1 text-cyan-300 hover:bg-gray-800'
+                              className='flex cursor-pointer flex-col border-b border-gray-300 py-1 text-cyan-300 hover:bg-gray-800'
                               onClick={() => handleRequestClick(req.requestId)}
                             >
                               <div>
-                                <div className='text-sm'>
+                                <div className='pb-3 text-sm'>
                                   Name: {requestsData.pages[0].name || 'N/A'}
                                 </div>
-                                <div className='text-xs text-gray-400'>
+                              </div>
+                              <div className='text-xs text-gray-300'>
+                                <div>
                                   PageId: {requestsData.pages[0].pageId}
                                 </div>
-                              </div>
-                              <div className='text-right text-xs text-gray-300'>
                                 <div>ReqID: {req.requestId}</div>
-                                <div>By: {req.requester}</div>
+                                <div
+                                  onClick={() =>
+                                    copyTxToClipboard(req.requester)
+                                  }
+                                  className='flex gap-2 pb-1'
+                                >
+                                  By: {shortenAddress(req.requester)}
+                                  {copiedTx === req.requester ? (
+                                    <Check
+                                      size={16}
+                                      className='text-green-400'
+                                    />
+                                  ) : (
+                                    <Clipboard size={16} />
+                                  )}
+                                </div>
                               </div>
                             </li>
                           ))}
@@ -557,7 +581,7 @@ export default function Mypage() {
             onClick={closeModal}
           >
             <motion.div
-              className='relative w-full max-w-4xl rounded bg-gray-900 p-6 text-white shadow-[0_0_20px_rgba(255,0,255,0.5)]'
+              className='relative h-[500px] w-full max-w-5xl rounded bg-gray-900 p-6 text-white shadow-[0_0_20px_rgba(255,0,255,0.5)]'
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.8 }}
@@ -593,7 +617,7 @@ export default function Mypage() {
                   <div className='mt-4 text-sm text-gray-400'>
                     Existing HTML Preview:
                   </div>
-                  <div className='mt-2 h-32 overflow-auto rounded bg-gray-800 p-2 text-xs'>
+                  <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
                     {selectedHtml}
                   </div>
                 </div>
@@ -613,7 +637,7 @@ export default function Mypage() {
                   <div className='mt-4 text-sm text-gray-400'>
                     Proposed HTML Preview:
                   </div>
-                  <div className='mt-2 h-32 overflow-auto rounded bg-gray-800 p-2 text-xs'>
+                  <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
                     {requestData.newHtml}
                   </div>
                 </div>
