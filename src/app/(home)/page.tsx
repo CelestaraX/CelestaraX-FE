@@ -16,15 +16,14 @@ export default function HomePage() {
           CELESTARAX
         </div>
         <p className='mt-4 max-w-md text-center text-xl text-gray-300'>
-          The world’s first decentralized prover network. <br />
-          Welcome to Level 1: Crisis of Trust
+          The Eternal On-Chain Page Hub
         </p>
 
         <button
           onClick={handleClick}
           className='mt-10 transform bg-pink-500 px-8 py-3 text-lg font-bold tracking-wider text-white shadow-[0_0_10px_#ff00ff] transition-transform hover:scale-105 hover:bg-pink-400'
         >
-          ENTER TESTNET
+          ENTER
         </button>
       </div>
     </main>

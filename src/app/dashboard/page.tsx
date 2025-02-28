@@ -6,6 +6,7 @@ import { useAccount } from 'wagmi';
 import { Canvas } from '@react-three/fiber';
 import { Planet } from './_components/Planet'; // Adjust import path
 import Header from '@/components/layout/Header'; // Adjust import path
+import { toast } from 'react-hot-toast';
 
 // We add GET_PAGE_CREATEDS as "GET_ALL_PAGES" to fetch all pages for ranking
 import {
@@ -19,7 +20,7 @@ import {
   fetchUpdateRequestFromContract,
 } from '@/lib/blockchain'; // The code from blockchain.ts
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Check, Clipboard, X } from 'lucide-react';
 import { PageCreated } from '@/types';
 
 /** Example type for updateRequests */
@@ -53,7 +54,7 @@ function safeNum(val?: string | null) {
 function Spinner() {
   return (
     <svg
-      className='h-6 w-6 animate-spin text-white'
+      className='text-neon-pink h-6 w-6 animate-spin'
       xmlns='http://www.w3.org/2000/svg'
       fill='none'
       viewBox='0 0 24 24'
@@ -111,6 +112,7 @@ export default function Mypage() {
   // 3) Local states
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedHtml, setSelectedHtml] = useState<string | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   // 4) Query to fetch "Requests" => GET_PAGE_UPDATES
   const {
@@ -168,7 +170,7 @@ export default function Mypage() {
     // Build a map: pageId => rank (1-based)
     const map: Record<string, number> = {};
     sorted.forEach((p, idx) => {
-      map[p.pageId] = idx + 1; // 1-based rank
+      map[p.pageId] = idx + 1;
     });
     return map;
   }, [allPagesData]);
@@ -219,9 +221,11 @@ export default function Mypage() {
   // Loading states
   if (myDeploymentsLoading || allPagesLoading) {
     return (
-      <div className='flex h-screen flex-col items-center justify-center bg-black text-white'>
+      <div className='text-neon-pink flex h-screen flex-col items-center justify-center'>
         <Spinner />
-        <p className='mt-2'>Loading your deployments / ranking...</p>
+        <p className='mt-2 font-mono text-lg tracking-wide'>
+          Loading your deployments / ranking...
+        </p>
       </div>
     );
   }
@@ -229,7 +233,7 @@ export default function Mypage() {
     return (
       <div>
         <Header />
-        <main className='flex h-screen items-center justify-center text-red-500'>
+        <main className='flex h-screen items-center justify-center'>
           Error(MyDeployments): {myDeploymentsError.message}
         </main>
       </div>
@@ -239,7 +243,7 @@ export default function Mypage() {
     return (
       <div>
         <Header />
-        <main className='flex h-screen items-center justify-center text-red-500'>
+        <main className='flex h-screen items-center justify-center'>
           Error(AllPages): {allPagesError.message}
         </main>
       </div>
@@ -251,17 +255,30 @@ export default function Mypage() {
     ? generatePlanetAttributes(selectedPageId)
     : null;
 
+  // 주소 축약 함수
+  const shortenAddress = (address: string) => {
+    return `${address.slice(0, 6)} ... ${address.slice(-4)}`;
+  };
+
+  // 클립보드 복사 함수
+  const copyToClipboard = (address: string, index: number) => {
+    navigator.clipboard.writeText(address);
+    setCopiedIndex(index); // 복사된 인덱스 저장
+    toast.success('Address copied!'); // 사용자 피드백 (선택 사항)
+    setTimeout(() => setCopiedIndex(null), 1500); // 1.5초 후 원래 상태로
+  };
+
   return (
-    <div>
+    <div className='min-h-screen'>
       <Header />
-      <main className='k flex h-[calc(100vh-100px)] flex-col items-center justify-center'>
-        <div className='relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-2 border-pink-500 p-4 text-pink-500'>
+      <main className='text-neon-pink flex h-[calc(100vh-100px)] flex-col items-center justify-center font-mono'>
+        <div className='border-neon-pink relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-[3px] p-4 shadow-[0_0_20px_rgba(255,0,255,0.5)]'>
           {/* Left area: Planet + Rank / Likes / Dislikes */}
           <div className='absolute left-4 top-16 w-[150px] text-white'>
             {/* Planet 3D */}
-            <div className='h-48 w-full'>
+            <div className='h-48 w-full border border-pink-500 p-2'>
               <Canvas>
-                <ambientLight intensity={0.8} />
+                <ambientLight intensity={20} />
                 <pointLight position={[10, 10, 10]} />
                 {selectedFile && (
                   <Planet
@@ -276,7 +293,7 @@ export default function Mypage() {
             </div>
 
             {/* PageId (replacing #ID => #PageId) */}
-            <div className='mt-2 text-xs text-white'>
+            <div className='text-neon-pink mt-2 text-xs'>
               {selectedPageId ? `#PageId: ${selectedPageId}` : '#PageId: N/A'}
             </div>
 
@@ -284,7 +301,7 @@ export default function Mypage() {
             <div className='mt-4 space-y-1 text-sm'>
               <div>
                 Rank:{' '}
-                <span className='text-cyan-300'>
+                <span className='text-neon-pink font-bold'>
                   {selectedPageId && rankMap[selectedPageId]
                     ? `#${rankMap[selectedPageId]}`
                     : '--'}
@@ -292,13 +309,13 @@ export default function Mypage() {
               </div>
               <div>
                 Likes:{' '}
-                <span className='text-green-400'>
+                <span className='font-bold text-green-400'>
                   {selectedPage ? safeNum(selectedPage.totalLikes) : 0}
                 </span>
               </div>
               <div>
                 Dislikes:{' '}
-                <span className='text-red-400'>
+                <span className='font-bold text-red-400'>
                   {selectedPage ? safeNum(selectedPage.totalDislikes) : 0}
                 </span>
               </div>
@@ -307,7 +324,7 @@ export default function Mypage() {
 
           {/* Right info panel */}
           <div className='absolute right-4 top-16 flex w-[200px] flex-col gap-2 text-sm text-white'>
-            <div className='font-bold text-pink-300'>Ownership</div>
+            <div className='text-neon-pink font-bold'>Ownership</div>
             <div>
               Type:{' '}
               {selectedPage
@@ -319,46 +336,69 @@ export default function Mypage() {
             <div className='border-b border-pink-500 pb-2' />
 
             {/* Moved Update Fee here */}
-            <div className='font-bold text-pink-300'>Update Fee</div>
-            <div className='mb-2 text-green-400'>
+            <div className='text-neon-pink font-bold'>Update Fee</div>
+            <div className='mb-2 font-semibold text-green-400'>
               {selectedPage ? safeNum(selectedPage.updateFee) : 0}
             </div>
 
-            <div className='font-bold text-pink-300'>Balance</div>
+            <div className='text-neon-pink font-bold'>Balance</div>
             <div className='mb-2'>
-              REMAINING:{' '}
-              <span className='text-green-400'>
-                {selectedPage?.balance ?? '0'} wei
-              </span>
+              <span className='text-gray-300'>Remaining:</span>{' '}
+              <span className='font-semibold text-green-400'>
+                {selectedPage?.balance ?? '0'}
+              </span>{' '}
+              <span className='text-xs text-gray-400'>wei</span>
             </div>
 
-            <div className='font-bold text-pink-300'>Owners</div>
-            {selectedPage?.multiSigOwners &&
-            selectedPage.multiSigOwners.length > 0 ? (
-              <ul className='ml-4 list-disc text-xs'>
-                {selectedPage.multiSigOwners.map((owner, idx) => (
-                  <li key={idx}>{owner}</li>
-                ))}
-              </ul>
-            ) : (
-              <div className='text-xs'>No owners (maybe permissionless?)</div>
-            )}
+            <div>
+              <div className='text-neon-pink mb-2 font-bold'>Owners</div>
+              {selectedPage?.multiSigOwners &&
+              selectedPage.multiSigOwners.length > 0 ? (
+                <ul className='ml-4 space-y-1 text-xs'>
+                  {selectedPage.multiSigOwners.map((owner, idx) => (
+                    <li
+                      key={idx}
+                      className='group flex items-center gap-2'
+                      onClick={() => copyToClipboard(owner, idx)}
+                    >
+                      {/* 주소 */}
+                      <span className='cursor-pointer transition hover:text-blue-400'>
+                        {shortenAddress(owner)}
+                      </span>
+
+                      {/* 복사 버튼 */}
+                      <button className='pb-1 opacity-50 transition group-hover:opacity-100'>
+                        {copiedIndex === idx ? (
+                          <Check size={16} className='text-green-400' />
+                        ) : (
+                          <Clipboard size={16} />
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className='text-xs text-gray-300'>
+                  No owners (maybe permissionless?)
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Middle: iframe preview */}
-          <div className='mb-10 flex h-[600px] w-[600px] max-w-4xl items-center justify-center overflow-hidden border border-pink-500 bg-white'>
+          <div className='border-neon-pink mb-10 flex h-[600px] w-[600px] max-w-4xl items-center justify-center overflow-hidden border bg-white shadow-[0_0_15px_rgba(255,0,255,0.4)]'>
             {selectedHtml ? (
               <iframe className='h-full w-full' srcDoc={selectedHtml} />
             ) : (
-              <span className='text-pink-500'>Select a page to preview</span>
+              <span className='text-neon-pink'>Select a page to preview</span>
             )}
           </div>
 
           {/* Bottom: My Deployments + Requests */}
           <div className='mt-6 flex w-full max-w-6xl space-x-6'>
             {/* Left - My Deployments (with Rank column) */}
-            <div className='flex-1 border border-pink-500 p-4'>
-              <h2 className='mb-3 text-lg font-bold text-pink-500'>
+            <div className='border-neon-pink flex-1 border p-4'>
+              <h2 className='text-neon-pink mb-3 text-lg font-bold'>
                 My Deployments
               </h2>
               {myDeploymentsLoading && (
@@ -373,9 +413,9 @@ export default function Mypage() {
                 </p>
               )}
 
-              <table className='w-full border-collapse'>
+              <table className='w-full border-collapse text-sm text-white'>
                 <thead>
-                  <tr className='border-b border-pink-500 text-pink-300'>
+                  <tr className='border-neon-pink text-neon-pink border-b'>
                     <th className='p-2 text-left'>Name</th>
                     <th className='p-2 text-left'>PageId</th>
                     <th className='p-2 text-left'>Ownership</th>
@@ -396,8 +436,8 @@ export default function Mypage() {
                     return (
                       <tr
                         key={page.id}
-                        className={`cursor-pointer border-b border-gray-700 hover:bg-gray-700 ${
-                          isSelected ? 'bg-gray-700' : ''
+                        className={`cursor-pointer border-b border-gray-700 hover:bg-gray-800 ${
+                          isSelected ? 'bg-gray-800' : ''
                         }`}
                         onClick={() => {
                           setSelectedPageId(page.pageId);
@@ -422,14 +462,16 @@ export default function Mypage() {
             </div>
 
             {/* Right - Requests */}
-            <div className='w-[300px] border border-pink-500 p-4'>
-              <h2 className='mb-3 text-lg font-bold text-pink-500'>Requests</h2>
+            <div className='border-neon-pink w-[300px] border p-4'>
+              <h2 className='text-neon-pink mb-3 text-lg font-bold'>
+                Requests
+              </h2>
 
               {selectedPage && isImmutableOrPerm && (
                 <div className='text-sm text-gray-300'>
                   {parseOwnershipType(selectedPage.ownershipType) ===
                   'Permissionless'
-                    ? 'This page is Permissionless. Updates do not require requests, or it cannot be updated in a controlled manner.'
+                    ? 'This page is Permissionless. Updates do not require requests.'
                     : 'This page is Immutable. No modification allowed.'}
                 </div>
               )}
@@ -508,7 +550,7 @@ export default function Mypage() {
             onClick={closeModal}
           >
             <motion.div
-              className='relative w-full max-w-4xl rounded bg-gray-900 p-6 text-white shadow-2xl'
+              className='relative w-full max-w-4xl rounded bg-gray-900 p-6 text-white shadow-[0_0_20px_rgba(255,0,255,0.5)]'
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.8 }}
@@ -520,14 +562,14 @@ export default function Mypage() {
               >
                 <X size={18} />
               </button>
-              <h2 className='mb-4 text-2xl font-bold text-pink-300'>
+              <h2 className='text-neon-pink mb-4 text-2xl font-bold'>
                 Update Request
               </h2>
 
               <div className='grid grid-cols-2 gap-6'>
                 {/* Left: existing data */}
                 <div className='border-r border-gray-700 pr-4'>
-                  <h3 className='mb-2 text-pink-400'>Current Page Info</h3>
+                  <h3 className='text-neon-pink mb-2'>Current Page Info</h3>
                   <div className='space-y-1 text-sm'>
                     <div>Page Name: {selectedPage.name}</div>
                     <div>
@@ -551,7 +593,7 @@ export default function Mypage() {
 
                 {/* Right: new update data */}
                 <div>
-                  <h3 className='mb-2 text-pink-400'>Proposed Changes</h3>
+                  <h3 className='text-neon-pink mb-2'>Proposed Changes</h3>
                   <div className='space-y-1 text-sm'>
                     <div>New Name: {requestData.newName || 'N/A'}</div>
                     <div>

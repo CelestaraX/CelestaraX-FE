@@ -27,14 +27,14 @@ export default function Header({ onDeployClick }: HeaderProps) {
     <header className='sticky top-0 z-50 flex w-full items-center justify-between bg-black bg-opacity-50 px-7 py-6 backdrop-blur-lg'>
       <div className='flex items-center space-x-2'>
         <Image src='/logo.png' alt='CELESTARAX Logo' width={50} height={50} />
-        <span className='font-mono text-2xl font-bold tracking-wide text-[#ff00ff]'>
+        <span className='font-tilt glitch-effect text-3xl font-bold tracking-wide text-[#ff00ff]'>
           CELESTARAX
         </span>
       </div>
 
       <nav className='flex items-center space-x-6 font-mono text-lg'>
         <Link href='/universe' className={getNavItemClass('/universe')}>
-          [UNIVERSE]
+          UNIVERSE
         </Link>
 
         <button
@@ -47,19 +47,21 @@ export default function Header({ onDeployClick }: HeaderProps) {
             }
           }}
         >
-          [EXPLORER]
+          EXPLORER
         </button>
 
         <Link href='/deploy' className={getNavItemClass('/deploy')}>
-          [DEPLOY]
+          DEPLOY
         </Link>
 
         <Link href='/dashboard' className={getNavItemClass('/dashboard')}>
-          [DASHBOARD]
+          DASHBOARD
         </Link>
 
         <div className='group relative'>
-          <button className={getNavItemClass('/about')}>[ABOUT] ▼</button>
+          <button className={`${getNavItemClass('/about')} flex items-center`}>
+            ABOUT <div className='pl-3'>▼</div>
+          </button>
           <div className='absolute left-0 mt-2 hidden w-40 border border-[#00ffff] bg-black bg-opacity-80 p-2 text-sm text-[#00ffff] backdrop-blur-md group-hover:block'>
             <Link
               href='#'
