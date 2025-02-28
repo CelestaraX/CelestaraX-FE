@@ -4,7 +4,7 @@ import React from 'react';
 import Header from '@/components/layout/Header';
 import HtmlCardSlider from './_components/HtmlCardSlider';
 
-export default function ArchivePage() {
+export default function ExplorerPage() {
   return (
     <div>
       <Header />
