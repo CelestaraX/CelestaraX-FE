@@ -31,7 +31,7 @@ import { mammothon } from '@/wagmi';
 
 import { GET_PAGE_CREATEDS } from '@/lib/graphql/queries';
 import { PageCreated } from '@/types';
-import { config } from '@/wagmi'; // Example global wagmi config
+import { config } from '@/wagmi'; // Your global wagmi config
 
 import { JsonRpcProvider, Contract } from 'ethers';
 import Image from 'next/image';
@@ -84,12 +84,12 @@ const FETCH_CONTRACT_ABI = [
 ];
 
 /**
- * Small spinner component
+ * Small spinner component (adding neon style)
  */
 function Spinner() {
   return (
     <svg
-      className='h-5 w-5 animate-spin text-white'
+      className='text-neon-pink h-5 w-5 animate-spin'
       xmlns='http://www.w3.org/2000/svg'
       fill='none'
       viewBox='0 0 24 24'
@@ -147,7 +147,7 @@ export default function HtmlCardSlider() {
   const [swiperRef, setSwiperRef] = useState<SwiperClass | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // HTML from contract
+  // Blockchain HTML
   const [blockchainHtml, setBlockchainHtml] = useState('<p>Loading...</p>');
 
   // Search filter
@@ -160,7 +160,7 @@ export default function HtmlCardSlider() {
   const { isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
 
-  // Filter pages
+  // Filter pages from subgraph
   const allPages = useMemo(() => data?.pages || [], [data]);
   const filteredPages = useMemo(() => {
     return allPages.filter((page) =>
@@ -170,7 +170,6 @@ export default function HtmlCardSlider() {
 
   /**
    * Local store for like/dislike counts.
-   * We'll parse subgraph data as number to avoid "01" glitch.
    */
   const [localVotes, setLocalVotes] = useState<{
     [pageId: string]: { totalLikes: number; totalDislikes: number };
@@ -184,7 +183,7 @@ export default function HtmlCardSlider() {
   }>({});
 
   /**
-   * On subgraph data update, parse totalLikes/totalDislikes as numbers
+   * On subgraph data update, parse totalLikes/totalDislikes as number
    */
   useEffect(() => {
     if (filteredPages.length > 0) {
@@ -192,31 +191,27 @@ export default function HtmlCardSlider() {
         [key: string]: { totalLikes: number; totalDislikes: number };
       } = {};
       filteredPages.forEach((page) => {
-        const likesNum = Number(page.totalLikes) || 0;
-        const dislikesNum = Number(page.totalDislikes) || 0;
         updated[page.pageId] = {
-          totalLikes: likesNum,
-          totalDislikes: dislikesNum,
+          totalLikes: Number(page.totalLikes) || 0,
+          totalDislikes: Number(page.totalDislikes) || 0,
         };
       });
       setLocalVotes((prev) => ({ ...prev, ...updated }));
     }
   }, [filteredPages]);
 
-  /**
-   * Additional state to keep spinner alive until on-chain confirmation
-   */
+  // For spinner
   const [isTxAwaitingConfirmation, setIsTxAwaitingConfirmation] =
     useState(false);
 
-  // Track pending tx
+  // Pending tx
   const [pendingTxPageId, setPendingTxPageId] = useState<string | null>(null);
   const [pendingTxIsLike, setPendingTxIsLike] = useState<boolean | null>(null);
 
   // Wagmi contract write
   const { data: txData, writeContract } = useWriteContract({ config });
 
-  // Nav button conditions
+  // Navigation checks
   const canPrev = activeIndex > 0;
   const canNext = activeIndex < filteredPages.length - 1;
 
@@ -226,6 +221,7 @@ export default function HtmlCardSlider() {
   const handleVote = useCallback(
     async (pageId: string, isLike: boolean) => {
       if (!isConnected) {
+        // If not connected, open wallet modal
         if (openConnectModal) {
           openConnectModal();
         } else {
@@ -235,12 +231,11 @@ export default function HtmlCardSlider() {
       }
 
       try {
-        // Set states for spinner
         setIsTxAwaitingConfirmation(true);
         setPendingTxPageId(pageId);
         setPendingTxIsLike(isLike);
 
-        // Immediately set userVotes
+        // Immediately set user vote so button color changes
         setUserVotes((prev) => ({
           ...prev,
           [pageId]: isLike,
@@ -267,7 +262,6 @@ export default function HtmlCardSlider() {
               setIsTxAwaitingConfirmation(false);
               setPendingTxPageId(null);
               setPendingTxIsLike(null);
-              // Reset userVotes
               setUserVotes((prev) => ({
                 ...prev,
                 [pageId]: null,
@@ -280,7 +274,6 @@ export default function HtmlCardSlider() {
         );
       } catch (err) {
         console.error('Error in simulateContract:', err);
-        // Reset
         setIsTxAwaitingConfirmation(false);
         setPendingTxPageId(null);
         setPendingTxIsLike(null);
@@ -294,7 +287,7 @@ export default function HtmlCardSlider() {
   );
 
   /**
-   * Wait for confirmation
+   * Wait for confirmation => update local state or refetch
    */
   useEffect(() => {
     if (!txData) return;
@@ -309,22 +302,16 @@ export default function HtmlCardSlider() {
         });
 
         if (!cancelled) {
-          // Update local votes
           if (pendingTxPageId && pendingTxIsLike !== null) {
+            // Update local votes
             setLocalVotes((prev) => {
               const curr = prev[pendingTxPageId] || {
                 totalLikes: 0,
                 totalDislikes: 0,
               };
-              let newLikes = curr.totalLikes;
-              let newDislikes = curr.totalDislikes;
-
-              if (pendingTxIsLike) {
-                newLikes += 1;
-              } else {
-                newDislikes += 1;
-              }
-
+              const newLikes = curr.totalLikes + (pendingTxIsLike ? 1 : 0);
+              const newDislikes =
+                curr.totalDislikes + (pendingTxIsLike ? 0 : 1);
               return {
                 ...prev,
                 [pendingTxPageId]: {
@@ -354,32 +341,28 @@ export default function HtmlCardSlider() {
     };
 
     waitForReceipt();
-
     return () => {
       cancelled = true;
     };
   }, [txData, pendingTxPageId, pendingTxIsLike, refetch]);
 
   /**
-   * Fetch HTML from contract when activeIndex changes
+   * Fetch HTML from chain when activeIndex changes
    */
   useEffect(() => {
     if (filteredPages.length === 0) {
       setBlockchainHtml('<p>No pages available</p>');
       return;
     }
-
     const page = filteredPages[activeIndex];
     if (!page) {
       setBlockchainHtml('<p>Invalid page</p>');
       return;
     }
-
-    fetchPageDataFromContract(page.pageId).then((html) => {
-      setBlockchainHtml(html);
-    });
+    fetchPageDataFromContract(page.pageId).then(setBlockchainHtml);
   }, [filteredPages, activeIndex]);
 
+  // Subgraph load states
   if (loading) {
     return <div className='text-white'>Loading from subgraph...</div>;
   }
@@ -387,20 +370,19 @@ export default function HtmlCardSlider() {
     return <div className='text-white'>Error: {error.message}</div>;
   }
 
-  const toggleDrawer = () => {
-    setIsDrawerOpen((prev) => !prev);
-  };
-
+  // Drawer controls
+  const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
   const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).id === 'drawerOverlay') {
       setIsDrawerOpen(false);
     }
   };
 
+  // Current page
   const currentPage = filteredPages[activeIndex] || null;
 
   /**
-   * Helper: should we show the spinner for a given button?
+   * Helper: check spinner state for a button
    */
   const shouldShowSpinner = (pageId: string, isLikeButton: boolean) => {
     return (
@@ -411,7 +393,7 @@ export default function HtmlCardSlider() {
   };
 
   return (
-    <div className='relative flex h-full w-full flex-col items-center justify-center gap-10'>
+    <div className='text-neon-pink relative flex h-full w-full flex-col items-center justify-center gap-10'>
       {/** Search input */}
       <div className='relative w-80'>
         <Search
@@ -423,13 +405,13 @@ export default function HtmlCardSlider() {
           placeholder='Search by pageId...'
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className='w-full rounded-xl bg-[#1c1c1e] px-10 py-2 text-gray-300 placeholder-gray-500 outline-none focus:ring-2 focus:ring-gray-600'
+          className='focus:ring-neon-pink w-full rounded-xl bg-[#1c1c1e] px-10 py-2 text-gray-300 placeholder-gray-500 outline-none focus:ring-2'
         />
       </div>
 
-      {/** Info drawer button */}
+      {/** Drawer button */}
       <motion.button
-        className='flex items-center gap-1 rounded-md bg-gray-600 px-3 py-2 text-white hover:bg-gray-500'
+        className='flex items-center gap-1 rounded-md bg-gray-700 px-4 py-2 text-white shadow-[0_0_8px_rgba(255,0,255,0.3)] hover:bg-gray-500'
         whileTap={{ scale: 0.9 }}
         onClick={toggleDrawer}
       >
@@ -438,19 +420,17 @@ export default function HtmlCardSlider() {
       </motion.button>
 
       {/** Swiper nav */}
-      <div className='flex w-full max-w-[1200px] items-center justify-between px-4'>
+      <div className='flex w-full max-w-[1600px] items-center justify-between px-4'>
         <motion.button
           disabled={!canPrev}
           className={`rounded-full p-3 text-white transition ${
             canPrev
-              ? 'bg-white/30 hover:bg-white/50'
+              ? 'border-neon-pink border bg-black hover:shadow-[0_0_10px_rgba(255,0,255,0.4)]'
               : 'cursor-not-allowed bg-gray-500/50'
           }`}
           whileHover={canPrev ? { scale: 1.2 } : {}}
           whileTap={canPrev ? { scale: 0.9 } : {}}
-          onClick={() => {
-            if (canPrev) swiperRef?.slidePrev();
-          }}
+          onClick={() => canPrev && swiperRef?.slidePrev()}
         >
           <ChevronLeft size={36} />
         </motion.button>
@@ -461,23 +441,23 @@ export default function HtmlCardSlider() {
           onSwiper={(swiper) => setSwiperRef(swiper)}
           onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
           modules={[Navigation]}
-          className='h-[700px] w-[600px] shadow-lg'
+          className='border-neon-pink h-[950px] w-[1300px] border bg-black/20 shadow-[0_0_15px_rgba(255,0,255,0.2)]'
         >
           {filteredPages.map((page) => (
             <SwiperSlide key={page.id}>
               <motion.div
-                className='flex h-full flex-col bg-white bg-opacity-[0.3] p-3 shadow-lg'
+                className='border-neon-pink flex h-full flex-col border-b bg-black bg-opacity-40 p-3 shadow-inner'
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                <h2 className='mb-3 text-center text-lg font-bold text-black'>
-                  PageId: {page.pageId}
+                <h2 className='text-neon-pink mb-3 text-center text-lg font-bold'>
+                  {page.name}
                 </h2>
                 {currentPage && currentPage.pageId === page.pageId ? (
                   <iframe
                     srcDoc={blockchainHtml}
-                    className='h-full w-full flex-1 border-none bg-gray-100'
+                    className='border-neon-pink h-full w-full flex-1 border bg-gray-900'
                     sandbox='allow-scripts allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox'
                   />
                 ) : (
@@ -494,27 +474,25 @@ export default function HtmlCardSlider() {
           disabled={!canNext}
           className={`rounded-full p-3 text-white transition ${
             canNext
-              ? 'bg-white/30 hover:bg-white/50'
+              ? 'border-neon-pink border bg-black hover:shadow-[0_0_10px_rgba(255,0,255,0.4)]'
               : 'cursor-not-allowed bg-gray-500/50'
           }`}
           whileHover={canNext ? { scale: 1.2 } : {}}
           whileTap={canNext ? { scale: 0.9 } : {}}
-          onClick={() => {
-            if (canNext) swiperRef?.slideNext();
-          }}
+          onClick={() => canNext && swiperRef?.slideNext()}
         >
           <ChevronRight size={36} />
         </motion.button>
       </div>
 
-      {/** Like/Dislike */}
+      {/** Like/Dislike section */}
       {currentPage && (
         <div className='flex items-center gap-5'>
           <motion.button
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition ${
+            className={`flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-white transition hover:shadow-[0_0_10px_rgba(255,255,255,0.3)] ${
               userVotes[currentPage.pageId] === true
-                ? 'bg-green-500'
-                : 'bg-gray-700'
+                ? 'border-green-500 bg-green-600'
+                : 'bg-gray-600'
             } ${
               shouldShowSpinner(currentPage.pageId, true)
                 ? 'pointer-events-none opacity-70'
@@ -528,7 +506,7 @@ export default function HtmlCardSlider() {
             ) : (
               <ThumbsUp size={20} />
             )}
-            <span>
+            <span className='font-semibold'>
               Like (
               {localVotes[currentPage.pageId]?.totalLikes ??
                 (Number(currentPage.totalLikes) || 0)}
@@ -537,10 +515,10 @@ export default function HtmlCardSlider() {
           </motion.button>
 
           <motion.button
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-white transition ${
+            className={`flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-white transition hover:shadow-[0_0_10px_rgba(255,255,255,0.3)] ${
               userVotes[currentPage.pageId] === false
-                ? 'bg-red-500'
-                : 'bg-gray-700'
+                ? 'border-red-500 bg-red-600'
+                : 'bg-gray-600'
             } ${
               shouldShowSpinner(currentPage.pageId, false)
                 ? 'pointer-events-none opacity-70'
@@ -554,7 +532,7 @@ export default function HtmlCardSlider() {
             ) : (
               <ThumbsDown size={20} />
             )}
-            <span>
+            <span className='font-semibold'>
               Dislike (
               {localVotes[currentPage.pageId]?.totalDislikes ??
                 (Number(currentPage.totalDislikes) || 0)}
@@ -573,7 +551,7 @@ export default function HtmlCardSlider() {
             onClick={handleOverlayClick}
           >
             <motion.div
-              className='relative h-full w-[550px] rounded-l-2xl bg-zinc-900 p-6 text-white shadow-2xl'
+              className='border-neon-pink relative h-full w-[550px] border-l-4 bg-zinc-900 p-6 text-white shadow-[0_0_15px_rgba(255,0,255,0.3)]'
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
@@ -586,8 +564,10 @@ export default function HtmlCardSlider() {
                 <X size={24} />
               </button>
 
-              <h2 className='mb-4 text-2xl font-bold'>Page Details</h2>
-              <div className='flex flex-col gap-4 overflow-y-auto pr-2'>
+              <h2 className='text-neon-pink mb-4 text-2xl font-bold'>
+                Page Details
+              </h2>
+              <div className='flex flex-col gap-4 overflow-y-auto pr-2 text-sm'>
                 <div>
                   <span className='font-semibold text-pink-400'>Page ID:</span>{' '}
                   {currentPage.pageId}
@@ -652,7 +632,7 @@ export default function HtmlCardSlider() {
                   <span className='font-semibold text-pink-400'>
                     MultiSig Owners:
                   </span>{' '}
-                  {currentPage.multiSigOwners?.join(', ')}
+                  {currentPage.multiSigOwners?.join(', ') || 'None'}
                 </div>
                 <div>
                   <span className='font-semibold text-pink-400'>
@@ -674,30 +654,3 @@ export default function HtmlCardSlider() {
     </div>
   );
 }
-
-/**
- * Example GET_PAGE_CREATEDS query:
- *
- * import { gql } from '@apollo/client';
- *
- * export const GET_PAGE_CREATEDS = gql`
- *   query GetAllPages {
- *     pages(first: 1000, orderBy: pageId, orderDirection: asc) {
- *       id
- *       pageId
- *       creator
- *       name
- *       thumbnail
- *       ownershipType
- *       updateFee
- *       imt
- *       currentHtml
- *       totalLikes
- *       totalDislikes
- *       balance
- *       multiSigOwners
- *       multiSigThreshold
- *     }
- *   }
- * `;
- */
