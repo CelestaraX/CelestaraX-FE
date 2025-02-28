@@ -7,7 +7,13 @@ import { Canvas } from '@react-three/fiber';
 import { Planet } from './_components/Planet'; // Adjust import path
 import Header from '@/components/layout/Header'; // Adjust import path
 
-import { GET_PAGES_BY_OWNER, GET_PAGE_UPDATES } from '@/lib/graphql/queries'; // Adjust path
+// We add GET_PAGE_CREATEDS as "GET_ALL_PAGES" to fetch all pages for ranking
+import {
+  GET_PAGES_BY_OWNER,
+  GET_PAGE_UPDATES,
+  GET_PAGE_CREATEDS as GET_ALL_PAGES,
+} from '@/lib/graphql/queries'; // Adjust path
+
 import {
   fetchPageDataFromContract,
   fetchUpdateRequestFromContract,
@@ -16,18 +22,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { PageCreated } from '@/types';
 
-/**
- * Example type for updateRequests
- */
+/** Example type for updateRequests */
 interface UpdateRequestSubgraph {
   requestId: string;
   requester: string;
 }
 
-/**
- * Helper function to parse ownershipType => "Single", "MultiSig", "Permissionless".
- * If subgraph returns numeric values 0,1,2, we convert accordingly.
- */
+/** Helper function to parse ownershipType => "Single", "MultiSig", "Permissionless". */
 function parseOwnershipType(value?: number) {
   switch (value) {
     case 0:
@@ -41,63 +42,77 @@ function parseOwnershipType(value?: number) {
   }
 }
 
-/**
- * Safe parse string to number
- */
+/** Safe parse string to number */
 function safeNum(val?: string | null) {
   if (!val) return 0;
   const n = parseInt(val, 10);
   return isNaN(n) ? 0 : n;
 }
 
-/**
- * StatBar component
- */
-export function StatBar({
-  label,
-  color,
-  value,
-  max,
-}: {
-  label: string;
-  color: string;
-  value: number;
-  max: number;
-}) {
+/** Small spinner component */
+function Spinner() {
   return (
-    <div className='mb-2'>
-      <div className='mb-1 text-xs font-bold text-white'>{label}:</div>
-      <div className='relative h-4 w-40 overflow-hidden rounded border border-pink-500'>
-        <div
-          className={`${color} h-full transition-all duration-300`}
-          style={{ width: `${(value / max) * 100}%` }}
-        />
-      </div>
-      <div className='text-xs text-gray-400'>
-        {value} / {max}
-      </div>
-    </div>
+    <svg
+      className='h-6 w-6 animate-spin text-white'
+      xmlns='http://www.w3.org/2000/svg'
+      fill='none'
+      viewBox='0 0 24 24'
+    >
+      <circle
+        className='opacity-25'
+        cx='12'
+        cy='12'
+        r='10'
+        stroke='currentColor'
+        strokeWidth='4'
+      />
+      <path
+        className='opacity-75'
+        fill='currentColor'
+        d='M4 12a8 8 0 018-8v8H4z'
+      />
+    </svg>
   );
+}
+
+/** Generate planet attributes from pageId */
+function generatePlanetAttributes(id: string) {
+  const hashCode = (str: string) => {
+    return str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  };
+  const numericId = hashCode(id);
+  return {
+    color: `#${((numericId * 9973) % 0xffffff).toString(16).padStart(6, '0')}`,
+    planetSize: (numericId % 6) + 2,
+    rotationSpeed: (numericId % 5) * 0.3 + 0.5,
+  };
 }
 
 export default function Mypage() {
   const { address } = useAccount();
 
-  // 1) Query to fetch "My Deployments" => GET_PAGES_BY_OWNER
+  // 1) Fetch "My Deployments"
   const {
     data: myDeploymentsData,
     loading: myDeploymentsLoading,
     error: myDeploymentsError,
   } = useQuery<{ pages: PageCreated[] }>(GET_PAGES_BY_OWNER, {
     variables: { ownerAddress: address?.toLowerCase() || '' },
-    skip: !address, // skip if not connected
+    skip: !address,
   });
 
-  // Local states
+  // 2) Fetch "All Pages" for ranking by likes
+  const {
+    data: allPagesData,
+    loading: allPagesLoading,
+    error: allPagesError,
+  } = useQuery<{ pages: PageCreated[] }>(GET_ALL_PAGES);
+
+  // 3) Local states
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedHtml, setSelectedHtml] = useState<string | null>(null);
 
-  // 2) Query to fetch "Requests" => GET_PAGE_UPDATES
+  // 4) Query to fetch "Requests" => GET_PAGE_UPDATES
   const {
     data: requestsData,
     loading: requestsLoading,
@@ -118,8 +133,16 @@ export default function Mypage() {
   }, [myDeploymentsData, selectedPageId]);
 
   /**
-   * When user clicks a row in "My Deployments," fetch HTML from contract
-   * and store it in selectedHtml.
+   * If no selection & there's a page list, auto-select the first
+   */
+  useEffect(() => {
+    if (!selectedPageId && myDeploymentsData?.pages?.[0]) {
+      setSelectedPageId(myDeploymentsData.pages[0].pageId);
+    }
+  }, [myDeploymentsData, selectedPageId]);
+
+  /**
+   * Fetch HTML from contract for selected page
    */
   useEffect(() => {
     if (!selectedPageId) {
@@ -132,24 +155,27 @@ export default function Mypage() {
   }, [selectedPageId]);
 
   /**
-   * Generate planet attributes based on pageId (sample logic)
+   * Compute rank by likes among all pages
    */
-  function generatePlanetAttributes(id: string) {
-    const hashCode = (str: string) => {
-      return str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    };
-    const numericId = hashCode(id);
-    return {
-      color: `#${((numericId * 9973) % 0xffffff).toString(16).padStart(6, '0')}`,
-      planetSize: (numericId % 6) + 2,
-      rotationSpeed: (numericId % 5) * 0.3 + 0.5,
-    };
-  }
-  const selectedFile = selectedPageId
-    ? generatePlanetAttributes(selectedPageId)
-    : null;
+  const rankMap = useMemo(() => {
+    if (!allPagesData?.pages) return {};
+    // Sort descending by totalLikes
+    const sorted = [...allPagesData.pages].sort((a, b) => {
+      const aLikes = safeNum(a.totalLikes);
+      const bLikes = safeNum(b.totalLikes);
+      return bLikes - aLikes; // desc
+    });
+    // Build a map: pageId => rank (1-based)
+    const map: Record<string, number> = {};
+    sorted.forEach((p, idx) => {
+      map[p.pageId] = idx + 1; // 1-based rank
+    });
+    return map;
+  }, [allPagesData]);
 
-  // For "Requests" => handle modal
+  /**
+   * For "Requests" => handle modal
+   */
   const [showRequestModal, setShowRequestModal] = useState(false);
 
   // The data for the chosen request from chain
@@ -162,14 +188,11 @@ export default function Mypage() {
   } | null>(null);
 
   /**
-   * "Requests" column => user clicks => open modal
-   * We'll fetch the new data from chain by (pageId, requestId)
+   * "Requests" => open modal & fetch chain data
    */
   const handleRequestClick = async (requestId: string) => {
     setShowRequestModal(true);
-
     if (!selectedPageId) return;
-
     const data = await fetchUpdateRequestFromContract(
       selectedPageId,
       requestId,
@@ -177,36 +200,28 @@ export default function Mypage() {
     if (data) setRequestData(data);
   };
 
-  /**
-   * close modal
-   */
   const closeModal = () => {
     setShowRequestModal(false);
     setRequestData(null);
   };
 
-  // ----------------------------------------------------------------
-  // [FIX] We define isImmutableOrPerm as a normal variable instead of using a Hook,
-  // to avoid "React Hook is called conditionally" error.
-  // ----------------------------------------------------------------
+  /**
+   * isImmutableOrPerm
+   */
   const isImmutableOrPerm = (() => {
     if (!selectedPage) return false;
-    // ownershipType is number => 2 means Permissionless
     const ownerNum = selectedPage.ownershipType ?? -1;
     const isPerm = ownerNum === 2;
-    // immutable flag
     const isImm = selectedPage.imt ?? false;
     return isPerm || isImm;
   })();
 
-  // Loading / error states. We put them AFTER all Hook definitions to avoid early returns
-  if (myDeploymentsLoading) {
+  // Loading states
+  if (myDeploymentsLoading || allPagesLoading) {
     return (
-      <div>
-        <Header />
-        <main className='flex h-screen items-center justify-center text-white'>
-          Loading your deployments...
-        </main>
+      <div className='flex h-screen flex-col items-center justify-center bg-black text-white'>
+        <Spinner />
+        <p className='mt-2'>Loading your deployments / ranking...</p>
       </div>
     );
   }
@@ -215,41 +230,36 @@ export default function Mypage() {
       <div>
         <Header />
         <main className='flex h-screen items-center justify-center text-red-500'>
-          Error: {myDeploymentsError.message}
+          Error(MyDeployments): {myDeploymentsError.message}
         </main>
       </div>
     );
   }
+  if (allPagesError) {
+    return (
+      <div>
+        <Header />
+        <main className='flex h-screen items-center justify-center text-red-500'>
+          Error(AllPages): {allPagesError.message}
+        </main>
+      </div>
+    );
+  }
+
+  // Planet attributes
+  const selectedFile = selectedPageId
+    ? generatePlanetAttributes(selectedPageId)
+    : null;
 
   return (
     <div>
       <Header />
       <main className='flex h-[calc(100vh-100px)] flex-col items-center justify-center bg-black'>
         <div className='relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-2 border-pink-500 p-4 text-pink-500'>
-          {/* Left stats + planet */}
-          <div className='absolute left-4 top-16 w-[150px] space-y-4'>
-            {/* Example: Show totalLikes, totalDislikes, etc. from selected page */}
-            <StatBar
-              label='Likes'
-              color='bg-pink-500'
-              value={selectedPage ? safeNum(selectedPage.totalLikes) : 0}
-              max={100} // arbitrary
-            />
-            <StatBar
-              label='Dislikes'
-              color='bg-blue-400'
-              value={selectedPage ? safeNum(selectedPage.totalDislikes) : 0}
-              max={100}
-            />
-            <StatBar
-              label='Update Fee'
-              color='bg-green-600'
-              value={selectedPage ? safeNum(selectedPage.updateFee) : 0}
-              max={10000} // arbitrary
-            />
-
-            {/* 3D Planet */}
-            <div className='mt-6 h-48 w-full'>
+          {/* Left area: Planet + Rank / Likes / Dislikes */}
+          <div className='absolute left-4 top-16 w-[150px] text-white'>
+            {/* Planet 3D */}
+            <div className='h-48 w-full'>
               <Canvas>
                 <ambientLight intensity={0.8} />
                 <pointLight position={[10, 10, 10]} />
@@ -265,27 +275,58 @@ export default function Mypage() {
               </Canvas>
             </div>
 
-            {/* ID or something */}
+            {/* PageId (replacing #ID => #PageId) */}
             <div className='mt-2 text-xs text-white'>
-              {selectedPageId ? `#ID: ${selectedPageId}` : '#ID: N/A'}
+              {selectedPageId ? `#PageId: ${selectedPageId}` : '#PageId: N/A'}
+            </div>
+
+            {/* Rank / Likes / Dislikes */}
+            <div className='mt-4 space-y-1 text-sm'>
+              <div>
+                Rank:{' '}
+                <span className='text-cyan-300'>
+                  {selectedPageId && rankMap[selectedPageId]
+                    ? `#${rankMap[selectedPageId]}`
+                    : '--'}
+                </span>
+              </div>
+              <div>
+                Likes:{' '}
+                <span className='text-green-400'>
+                  {selectedPage ? safeNum(selectedPage.totalLikes) : 0}
+                </span>
+              </div>
+              <div>
+                Dislikes:{' '}
+                <span className='text-red-400'>
+                  {selectedPage ? safeNum(selectedPage.totalDislikes) : 0}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Right info panel - for example, ownershipType, balance, owners, etc. */}
+          {/* Right info panel */}
           <div className='absolute right-4 top-16 flex w-[200px] flex-col gap-2 text-sm text-white'>
             <div className='font-bold text-pink-300'>Ownership</div>
             <div>
-              Type:&nbsp;
+              Type:{' '}
               {selectedPage
                 ? parseOwnershipType(selectedPage.ownershipType)
                 : '--'}
             </div>
             <div>Threshold: {selectedPage?.multiSigThreshold ?? '--'}</div>
+
             <div className='border-b border-pink-500 pb-2' />
+
+            {/* Moved Update Fee here */}
+            <div className='font-bold text-pink-300'>Update Fee</div>
+            <div className='mb-2 text-green-400'>
+              {selectedPage ? safeNum(selectedPage.updateFee) : 0}
+            </div>
 
             <div className='font-bold text-pink-300'>Balance</div>
             <div className='mb-2'>
-              BALANCE REMAINING:{' '}
+              REMAINING:{' '}
               <span className='text-green-400'>
                 {selectedPage?.balance ?? '0'} wei
               </span>
@@ -315,25 +356,31 @@ export default function Mypage() {
 
           {/* Bottom: My Deployments + Requests */}
           <div className='mt-6 flex w-full max-w-6xl space-x-6'>
-            {/* Left - My Deployments with new columns */}
+            {/* Left - My Deployments (with Rank column) */}
             <div className='flex-1 border border-pink-500 p-4'>
               <h2 className='mb-3 text-lg font-bold text-pink-500'>
                 My Deployments
               </h2>
+              {myDeploymentsLoading && (
+                <div className='flex items-center gap-2 text-white'>
+                  <Spinner />
+                  <span>Loading My Deployments...</span>
+                </div>
+              )}
               {myDeploymentsData?.pages?.length === 0 && (
                 <p className='text-sm text-gray-300'>
                   No pages found for your address.
                 </p>
               )}
+
               <table className='w-full border-collapse'>
                 <thead>
                   <tr className='border-b border-pink-500 text-pink-300'>
                     <th className='p-2 text-left'>Name</th>
                     <th className='p-2 text-left'>PageId</th>
-                    {/* Ownership + Immutable */}
                     <th className='p-2 text-left'>Ownership</th>
+                    <th className='p-2 text-left'>Rank</th>
                     <th className='p-2 text-left'>Immutable</th>
-                    {/* Likes, Dislikes */}
                     <th className='p-2 text-left'>Likes</th>
                     <th className='p-2 text-left'>Dislikes</th>
                   </tr>
@@ -341,10 +388,17 @@ export default function Mypage() {
                 <tbody>
                   {myDeploymentsData?.pages?.map((page) => {
                     const ownershipStr = parseOwnershipType(page.ownershipType);
+                    const isSelected = selectedPageId === page.pageId;
+                    const rankVal = rankMap[page.pageId]
+                      ? `#${rankMap[page.pageId]}`
+                      : '--';
+
                     return (
                       <tr
                         key={page.id}
-                        className='cursor-pointer border-b border-gray-700 hover:bg-gray-800'
+                        className={`cursor-pointer border-b border-gray-700 hover:bg-gray-700 ${
+                          isSelected ? 'bg-gray-700' : ''
+                        }`}
                         onClick={() => {
                           setSelectedPageId(page.pageId);
                         }}
@@ -352,6 +406,7 @@ export default function Mypage() {
                         <td className='p-2 text-cyan-300'>{page.name}</td>
                         <td className='p-2'>{page.pageId}</td>
                         <td className='p-2'>{ownershipStr}</td>
+                        <td className='p-2 text-yellow-400'>{rankVal}</td>
                         <td className='p-2'>{page.imt ? 'True' : 'False'}</td>
                         <td className='p-2 text-green-400'>
                           {safeNum(page.totalLikes)}
@@ -370,7 +425,6 @@ export default function Mypage() {
             <div className='w-[300px] border border-pink-500 p-4'>
               <h2 className='mb-3 text-lg font-bold text-pink-500'>Requests</h2>
 
-              {/* If selected page is immutable or permissionless => show special message */}
               {selectedPage && isImmutableOrPerm && (
                 <div className='text-sm text-gray-300'>
                   {parseOwnershipType(selectedPage.ownershipType) ===
@@ -380,19 +434,18 @@ export default function Mypage() {
                 </div>
               )}
 
-              {/* If user hasn't chosen a page yet */}
               {!selectedPageId && (
                 <div className='text-sm text-gray-300'>
                   Select a page to see requests
                 </div>
               )}
 
-              {/* If the page is updatable, show requests data */}
               {!isImmutableOrPerm && selectedPageId && (
                 <>
                   {requestsLoading && (
-                    <div className='text-sm text-gray-300'>
-                      Loading requests...
+                    <div className='flex items-center gap-2 text-white'>
+                      <Spinner />
+                      <span>Loading requests...</span>
                     </div>
                   )}
                   {requestsError && (
@@ -415,7 +468,6 @@ export default function Mypage() {
                               className='flex cursor-pointer justify-between border-b border-gray-700 py-1 text-cyan-300 hover:bg-gray-800'
                               onClick={() => handleRequestClick(req.requestId)}
                             >
-                              {/* columns: name, id, requestId, requester */}
                               <div>
                                 <div className='text-sm'>
                                   Name: {requestsData.pages[0].name || 'N/A'}
@@ -445,7 +497,7 @@ export default function Mypage() {
         </div>
       </main>
 
-      {/* Modal for a single request: left=old data, right=new data */}
+      {/* Modal for a single request */}
       <AnimatePresence>
         {showRequestModal && selectedPageId && selectedPage && requestData && (
           <motion.div
@@ -460,7 +512,7 @@ export default function Mypage() {
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.8 }}
-              onClick={(e) => e.stopPropagation()} // prevent closing
+              onClick={(e) => e.stopPropagation()}
             >
               <button
                 onClick={closeModal}
@@ -493,10 +545,7 @@ export default function Mypage() {
                     Existing HTML Preview:
                   </div>
                   <div className='mt-2 h-32 overflow-auto rounded bg-gray-800 p-2 text-xs'>
-                    {selectedHtml
-                      ? selectedHtml.substring(0, 300) +
-                        (selectedHtml.length > 300 ? '...' : '')
-                      : 'N/A'}
+                    {selectedHtml}
                   </div>
                 </div>
 
@@ -516,10 +565,7 @@ export default function Mypage() {
                     Proposed HTML Preview:
                   </div>
                   <div className='mt-2 h-32 overflow-auto rounded bg-gray-800 p-2 text-xs'>
-                    {requestData.newHtml
-                      ? requestData.newHtml.substring(0, 300) +
-                        (requestData.newHtml.length > 300 ? '...' : '')
-                      : 'N/A'}
+                    {requestData.newHtml}
                   </div>
                 </div>
               </div>

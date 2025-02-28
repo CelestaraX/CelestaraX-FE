@@ -11,7 +11,6 @@ export default function HomePage() {
 
   return (
     <main className='relative flex h-screen flex-col items-center justify-center text-white'>
-      {/* 로고 + 문구 */}
       <div className='text-center'>
         <div className='glitch-effect text-7xl font-bold text-pink-500'>
           CELESTARAX
@@ -21,7 +20,6 @@ export default function HomePage() {
           Welcome to Level 1: Crisis of Trust
         </p>
 
-        {/* 버튼 */}
         <button
           onClick={handleClick}
           className='mt-10 transform bg-pink-500 px-8 py-3 text-lg font-bold tracking-wider text-white shadow-[0_0_10px_#ff00ff] transition-transform hover:scale-105 hover:bg-pink-400'
