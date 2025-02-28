@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Clipboard, X } from 'lucide-react';
 import { PageCreated } from '@/types';
+import { ethers } from 'ethers';
 
 /** Example type for updateRequests */
 interface UpdateRequestSubgraph {
@@ -336,18 +337,23 @@ export default function Mypage() {
             <div className='border-b border-pink-500 pb-2' />
 
             {/* Moved Update Fee here */}
-            <div className='text-neon-pink font-bold'>Update Fee</div>
+            <div className='text-neon-pink font-bold'>Update Fee:</div>
             <div className='mb-2 font-semibold text-green-400'>
-              {selectedPage ? safeNum(selectedPage.updateFee) : 0}
+              <span>
+                {selectedPage
+                  ? ethers.formatEther(BigInt(safeNum(selectedPage.updateFee)))
+                  : 0}
+              </span>
+              <span className='pl-3 text-xs text-gray-400'>Eth</span>
             </div>
 
-            <div className='text-neon-pink font-bold'>Balance</div>
+            <div className='text-neon-pink font-bold'>Balance:</div>
             <div className='mb-2'>
-              <span className='text-gray-300'>Remaining:</span>{' '}
               <span className='font-semibold text-green-400'>
-                {selectedPage?.balance ?? '0'}
-              </span>{' '}
-              <span className='text-xs text-gray-400'>wei</span>
+                {ethers.formatEther(BigInt(safeNum(selectedPage?.balance))) ??
+                  '0'}
+              </span>
+              <span className='pl-3 text-xs text-gray-400'>Eth</span>
             </div>
 
             <div>
