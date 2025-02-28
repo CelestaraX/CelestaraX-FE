@@ -58,26 +58,6 @@ export default function Header({ onDeployClick }: HeaderProps) {
           DASHBOARD
         </Link>
 
-        <div className='group relative'>
-          <button className={`${getNavItemClass('/about')} flex items-center`}>
-            ABOUT <div className='pl-3'>▼</div>
-          </button>
-          <div className='absolute left-0 mt-2 hidden w-40 border border-[#00ffff] bg-black bg-opacity-80 p-2 text-sm text-[#00ffff] backdrop-blur-md group-hover:block'>
-            <Link
-              href='#'
-              className='block px-2 py-1 hover:bg-[#00ffff] hover:text-black'
-            >
-              Team
-            </Link>
-            <Link
-              href='#'
-              className='block px-2 py-1 hover:bg-[#00ffff] hover:text-black'
-            >
-              Contact
-            </Link>
-          </div>
-        </div>
-
         <WalletConnectButton />
       </nav>
     </header>

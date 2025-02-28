@@ -332,30 +332,9 @@ export default function Mypage() {
                 ? parseOwnershipType(selectedPage.ownershipType)
                 : '--'}
             </div>
-            <div>Threshold: {selectedPage?.multiSigThreshold ?? '--'}</div>
-
-            <div className='border-b border-pink-500 pb-2' />
-
-            {/* Moved Update Fee here */}
-            <div className='text-neon-pink font-bold'>Update Fee:</div>
-            <div className='mb-2 font-semibold text-green-400'>
-              <span>
-                {selectedPage
-                  ? ethers.formatEther(BigInt(safeNum(selectedPage.updateFee)))
-                  : 0}
-              </span>
-              <span className='pl-3 text-xs text-gray-400'>Eth</span>
+            <div className='pb-3'>
+              Threshold: {selectedPage?.multiSigThreshold ?? '--'}
             </div>
-
-            <div className='text-neon-pink font-bold'>Balance:</div>
-            <div className='mb-2'>
-              <span className='font-semibold text-green-400'>
-                {ethers.formatEther(BigInt(safeNum(selectedPage?.balance))) ??
-                  '0'}
-              </span>
-              <span className='pl-3 text-xs text-gray-400'>Eth</span>
-            </div>
-
             <div>
               <div className='text-neon-pink mb-2 font-bold'>Owners</div>
               {selectedPage?.multiSigOwners &&
@@ -388,6 +367,28 @@ export default function Mypage() {
                   No owners (maybe permissionless?)
                 </div>
               )}
+            </div>
+
+            <div className='border-b border-pink-500 pb-3' />
+
+            {/* Moved Update Fee here */}
+            <div className='text-neon-pink pt-3 font-bold'>Update Fee:</div>
+            <div className='mb-2 font-semibold text-green-400'>
+              <span>
+                {selectedPage
+                  ? ethers.formatEther(BigInt(safeNum(selectedPage.updateFee)))
+                  : 0}
+              </span>
+              <span className='pl-3 text-xs text-gray-400'>Eth</span>
+            </div>
+
+            <div className='text-neon-pink font-bold'>Balance:</div>
+            <div className='mb-2'>
+              <span className='font-semibold text-green-400'>
+                {ethers.formatEther(BigInt(safeNum(selectedPage?.balance))) ??
+                  '0'}
+              </span>
+              <span className='pl-3 text-xs text-gray-400'>Eth</span>
             </div>
           </div>
 
