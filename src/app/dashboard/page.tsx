@@ -85,7 +85,7 @@ function generatePlanetAttributes(id: string) {
   const numericId = hashCode(id);
   return {
     color: `#${((numericId * 9973) % 0xffffff).toString(16).padStart(6, '0')}`,
-    planetSize: (numericId % 6) + 2,
+    planetSize: 2,
     rotationSpeed: (numericId % 5) * 0.3 + 0.5,
   };
 }
@@ -284,11 +284,11 @@ export default function Mypage() {
       <main className='text-neon-pink flex h-[calc(100vh-100px)] flex-col items-center justify-center font-mono'>
         <div className='border-neon-pink relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-[3px] p-4 shadow-[0_0_20px_rgba(255,0,255,0.5)]'>
           {/* Left area: Planet + Rank / Likes / Dislikes */}
-          <div className='absolute left-9 top-[75px] flex h-[250px] w-[200px] flex-col pl-5 text-white'>
+          <div className='absolute left-9 top-[75px] flex h-[350px] w-[200px] flex-col pl-5 text-white'>
             {/* Planet 3D */}
             <div className='h-full w-full border border-pink-500 p-2'>
               <Canvas>
-                <ambientLight intensity={20} />
+                <ambientLight intensity={10} />
                 <pointLight position={[10, 10, 10]} />
                 {selectedFile && (
                   <Planet
