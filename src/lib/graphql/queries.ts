@@ -2,7 +2,7 @@ import { gql } from '@apollo/client';
 
 export const GET_PAGE_CREATEDS = gql`
   query GetAllPages {
-    pages(first: 1000, orderBy: pageId, orderDirection: asc) {
+    pages(first: 1000, orderBy: totalLikes, orderDirection: desc) {
       id
       pageId
       creator

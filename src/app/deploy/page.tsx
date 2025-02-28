@@ -11,6 +11,7 @@ import CustomStarsPlanet from '@/components/CustomStarsPlanet';
 import { simulateContract, waitForTransactionReceipt } from 'wagmi/actions';
 import { config, mammothon } from '@/wagmi'; // your global wagmi config
 import { defaultThumbnailBase64 } from '@/const'; // your default thumbnail in base64
+import { ethers } from 'ethers';
 
 /**
  * CircularProgress - ring around the planet to show progress
@@ -454,6 +455,15 @@ export default function DeployPage() {
       };
 
       reader.readAsText(file);
+      return;
+    }
+
+    if (field === 'fee') {
+      updateForm({
+        ...formData,
+        fee: `${ethers.parseEther(`${value}`)}`,
+      });
+
       return;
     }
 
@@ -922,7 +932,9 @@ export default function DeployPage() {
 
             {/* 4) Fee */}
             <div className='relative flex flex-col gap-2'>
-              <label className='text-sm text-cyan-300'>Modification Fee</label>
+              <label className='text-sm text-cyan-300'>
+                Modification Fee (ETH)
+              </label>
               <input
                 type='number'
                 placeholder='Enter modification fee'

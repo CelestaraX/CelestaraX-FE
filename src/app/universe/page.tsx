@@ -49,7 +49,7 @@ export default function UniversePage() {
       <main className='flex h-[calc(100vh-100px)]'>
         {/* 📝 Typing Text Box */}
         <div
-          className='absolute left-[400px] top-[200px] min-h-[100px] w-[500px] -translate-x-1/2 transition-opacity duration-1000'
+          className='font-size text-md absolute left-[400px] top-[200px] min-h-[100px] w-[500px] -translate-x-1/2 transition-opacity duration-1000'
           style={{ opacity }}
         >
           <TypingText text={longText} speed={15} />

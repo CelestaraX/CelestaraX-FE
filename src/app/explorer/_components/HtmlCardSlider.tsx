@@ -162,10 +162,17 @@ export default function HtmlCardSlider() {
 
   // Filter pages from subgraph
   const allPages = useMemo(() => data?.pages || [], [data]);
+
   const filteredPages = useMemo(() => {
-    return allPages.filter((page) =>
-      page.pageId.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
+    return allPages
+      .filter((page) =>
+        page.pageId.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+      .map((page) => ({
+        ...page,
+        totalScore: Number(page.totalLikes) - Number(page.totalDislikes),
+      }))
+      .sort((a, b) => b.totalScore - a.totalScore);
   }, [searchQuery, allPages]);
 
   /**
@@ -441,7 +448,7 @@ export default function HtmlCardSlider() {
           onSwiper={(swiper) => setSwiperRef(swiper)}
           onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
           modules={[Navigation]}
-          className='border-neon-pink h-[950px] w-[1300px] border bg-black/20 shadow-[0_0_15px_rgba(255,0,255,0.2)]'
+          className='border-neon-pink h-[800px] w-[1300px] border bg-black/20 shadow-[0_0_15px_rgba(255,0,255,0.2)]'
         >
           {filteredPages.map((page) => (
             <SwiperSlide key={page.id}>
