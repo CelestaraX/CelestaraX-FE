@@ -12,13 +12,15 @@ const Header = dynamic(() => import('@/components/layout/Header'), {
   ssr: false,
 });
 
-const longText = `This planet represents Celestia.<br/>
-Various HTML files are represented as surrounding planets here,<br/>
-allowing users to deploy and interact with them.<br/>
-<span style="color: #ff00ff;">1. Onchain Million Dollar</span><br/>  <!-- Hot Pink -->
-<span style="color: #00ffff;">2. Flappy Square</span><br/>  <!-- Neon Blue -->
-<span style="color: #ffcc00;">3. Space Shooter</span><br/>  <!-- Yellow -->
-<span style="color: #ff4444;">4. Breakout</span>`;
+const longText = `This galaxy is called CelestaraX.
+CelestaraX is the name of the Eternal On-Chain Page Hub project,
+a fusion of Celestia + Star (page) + Era (a new era of fully on-chain pages).<br/>
+Here, you can experience the true Web3 era of pages.<br/>
+Below is a list of the top 4 most popular pages right now:<br/>
+<span style="color: #ff00ff;">Onchain Million Dollar</span><br/>  <!-- Hot Pink -->
+<span style="color: #00ffff;">Flappy Square</span><br/>  <!-- Neon Blue -->
+<span style="color: #ffcc00;">Space Shooter</span><br/>  <!-- Yellow -->
+<span style="color: #ff4444;">Hello World</span>`;
 
 export default function UniversePage() {
   const router = useRouter();
@@ -49,7 +51,7 @@ export default function UniversePage() {
       <main className='flex h-[calc(100vh-100px)]'>
         {/* 📝 Typing Text Box */}
         <div
-          className='font-size text-md absolute left-[400px] top-[200px] min-h-[100px] w-[500px] -translate-x-1/2 transition-opacity duration-1000'
+          className='font-size text-md absolute left-[500px] top-[200px] min-h-[100px] w-[800px] -translate-x-1/2 transition-opacity duration-1000'
           style={{ opacity }}
         >
           <TypingText text={longText} speed={15} />
