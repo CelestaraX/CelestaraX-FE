@@ -254,7 +254,7 @@ export default function Mypage() {
   return (
     <div>
       <Header />
-      <main className='flex h-[calc(100vh-100px)] flex-col items-center justify-center bg-black'>
+      <main className='k flex h-[calc(100vh-100px)] flex-col items-center justify-center'>
         <div className='relative flex h-[1000px] w-[1200px] flex-col items-center justify-center border-2 border-pink-500 p-4 text-pink-500'>
           {/* Left area: Planet + Rank / Likes / Dislikes */}
           <div className='absolute left-4 top-16 w-[150px] text-white'>
