@@ -15,7 +15,7 @@ export default function HomePage() {
         <div className='font-tilt glitch-effect text-7xl font-bold text-pink-500'>
           CELESTARAX
         </div>
-        <p className='mt-4 max-w-md text-center text-xl text-gray-300'>
+        <p className='mt-4 max-w-md text-center font-mono text-xl text-gray-300'>
           The Eternal On-Chain Page Hub
         </p>
 
