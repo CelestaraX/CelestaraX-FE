@@ -12,7 +12,7 @@ export default function HomePage() {
   return (
     <main className='relative flex h-screen flex-col items-center justify-center text-white'>
       <div className='text-center'>
-        <div className='glitch-effect text-7xl font-bold text-pink-500'>
+        <div className='font-tilt glitch-effect text-7xl font-bold text-pink-500'>
           CELESTARAX
         </div>
         <p className='mt-4 max-w-md text-center text-xl text-gray-300'>

@@ -12,6 +12,10 @@ export default {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
       },
+      fontFamily: {
+        tilt: 'var(--font-tilt)',
+      },
+
       keyframes: {
         starGlow: {
           '0%, 100%': {

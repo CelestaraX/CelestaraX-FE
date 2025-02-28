@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Tilt_Prism } from 'next/font/google';
 import './globals.css';
 import '@rainbow-me/rainbowkit/styles.css';
 import { Providers } from './providers';
 import StarsSceneWrapper from '@/components/StarsSceneWrapper';
+
+const tiltPrism = Tilt_Prism({
+  variable: '--font-tilt',
+  subsets: ['latin'],
+});
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} m-0 p-0 antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${tiltPrism.variable} m-0 p-0 antialiased`}
       >
         <Providers>
           <div className='flex min-h-screen flex-col'>
