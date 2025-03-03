@@ -56,7 +56,7 @@ A decentralized advertising platform that leverages on-chain HTML and smart cont
 
 ### Core Components
 
-#### 1. Million Dollar Contract
+#### 1. Million Dollar Contract ([code](https://github.com/CelestaraX/CelestaraX-Contracts/blob/main/src/MillionDollar.sol))
 - Manages multiple advertising slots with images, links, and expiration data.
 - Handles slot purchases and ownership transfers.
 - Functions as an on-chain database for all ad content.
