@@ -572,9 +572,17 @@ export default function DashboardPage() {
           <div className='absolute left-9 top-[75px] flex h-[350px] w-[200px] flex-col pl-5 text-white'>
             {/* Planet 3D */}
             <div className='h-full w-full border border-pink-500 p-2'>
-              <Canvas>
-                <ambientLight intensity={10} />
-                <pointLight position={[10, 10, 10]} />
+              <Canvas shadows>
+                <ambientLight intensity={0.5} />
+
+                <directionalLight
+                  position={[5, 5, 5]}
+                  intensity={30}
+                  castShadow
+                  shadow-mapSize={[1024, 1024]}
+                />
+
+                <pointLight position={[-5, -5, -5]} intensity={10} />
                 {selectedFile && (
                   <Planet
                     key={selectedPageId}
@@ -683,7 +691,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Middle: iframe preview */}
-          <div className='border-neon-pink mb-10 flex h-[600px] w-[600px] max-w-4xl items-center justify-center overflow-hidden border bg-white shadow-[0_0_15px_rgba(255,0,255,0.4)]'>
+          <div className='border-neon-pink mb-10 flex h-[500px] w-[600px] max-w-4xl items-center justify-center border bg-white shadow-[0_0_15px_rgba(255,0,255,0.4)]'>
             {selectedHtml ? (
               <iframe className='h-full w-full' srcDoc={selectedHtml} />
             ) : myDeploymentsData?.pages?.length ? (
