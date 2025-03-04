@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import { useAccount } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit'; // Added for connect modal
 import { Canvas } from '@react-three/fiber';
 import { Planet } from './_components/Planet'; // Adjust import path
 import Header from '@/components/layout/Header'; // Adjust import path
@@ -24,13 +25,18 @@ import { Check, Clipboard, X } from 'lucide-react';
 import { PageCreated } from '@/types';
 import { ethers } from 'ethers';
 
-/** Example type for updateRequests */
+/**
+ * Example type for updateRequests (subgraph).
+ */
 interface UpdateRequestSubgraph {
   requestId: string;
   requester: string;
 }
 
-/** Helper function to parse ownershipType => "Single", "MultiSig", "Permissionless". */
+/**
+ * parseOwnershipType:
+ * Converts numeric ownershipType into readable string.
+ */
 function parseOwnershipType(value?: number) {
   switch (value) {
     case 0:
@@ -44,14 +50,20 @@ function parseOwnershipType(value?: number) {
   }
 }
 
-/** Safe parse string to number */
+/**
+ * safeNum:
+ * Converts string to number safely.
+ */
 function safeNum(val?: string | null) {
   if (!val) return 0;
   const n = parseInt(val, 10);
   return isNaN(n) ? 0 : n;
 }
 
-/** Small spinner component */
+/**
+ * Spinner:
+ * A small loading indicator.
+ */
 function Spinner() {
   return (
     <svg
@@ -77,7 +89,10 @@ function Spinner() {
   );
 }
 
-/** Generate planet attributes from pageId */
+/**
+ * generatePlanetAttributes:
+ * Generates color, size, rotation for 3D planet based on pageId.
+ */
 function generatePlanetAttributes(id: string) {
   const hashCode = (str: string) => {
     return str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -91,9 +106,15 @@ function generatePlanetAttributes(id: string) {
 }
 
 export default function Mypage() {
-  const { address } = useAccount();
+  /**
+   * Wallet connection
+   */
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
 
-  // 1) Fetch "My Deployments"
+  /**
+   * Queries: My Deployments & All Pages (for ranking)
+   */
   const {
     data: myDeploymentsData,
     loading: myDeploymentsLoading,
@@ -103,20 +124,19 @@ export default function Mypage() {
     skip: !address,
   });
 
-  // 2) Fetch "All Pages" for ranking by likes
   const {
     data: allPagesData,
     loading: allPagesLoading,
     error: allPagesError,
   } = useQuery<{ pages: PageCreated[] }>(GET_ALL_PAGES);
 
-  // 3) Local states
+  /**
+   * Local state for selected page and HTML
+   */
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedHtml, setSelectedHtml] = useState<string | null>(null);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [copiedTx, setCopiedTx] = useState<string>('');
 
-  // 4) Query to fetch "Requests" => GET_PAGE_UPDATES
+  // Requests data
   const {
     data: requestsData,
     loading: requestsLoading,
@@ -129,7 +149,7 @@ export default function Mypage() {
   });
 
   /**
-   * The selected page from "My Deployments"
+   * selectedPage => whichever user chose from My Deployments
    */
   const selectedPage = useMemo(() => {
     if (!myDeploymentsData?.pages || !selectedPageId) return null;
@@ -137,7 +157,7 @@ export default function Mypage() {
   }, [myDeploymentsData, selectedPageId]);
 
   /**
-   * If no selection & there's a page list, auto-select the first
+   * Auto-select the first if none chosen
    */
   useEffect(() => {
     if (!selectedPageId && myDeploymentsData?.pages?.[0]) {
@@ -146,7 +166,7 @@ export default function Mypage() {
   }, [myDeploymentsData, selectedPageId]);
 
   /**
-   * Fetch HTML from contract for selected page
+   * Fetch HTML from contract for chosen page
    */
   useEffect(() => {
     if (!selectedPageId) {
@@ -159,17 +179,15 @@ export default function Mypage() {
   }, [selectedPageId]);
 
   /**
-   * Compute rank by likes among all pages
+   * rankMap => compute rank by likes among all pages
    */
   const rankMap = useMemo(() => {
     if (!allPagesData?.pages) return {};
-    // Sort descending by totalLikes
     const sorted = [...allPagesData.pages].sort((a, b) => {
       const aLikes = safeNum(a.totalLikes);
       const bLikes = safeNum(b.totalLikes);
-      return bLikes - aLikes; // desc
+      return bLikes - aLikes;
     });
-    // Build a map: pageId => rank (1-based)
     const map: Record<string, number> = {};
     sorted.forEach((p, idx) => {
       map[p.pageId] = idx + 1;
@@ -178,11 +196,9 @@ export default function Mypage() {
   }, [allPagesData]);
 
   /**
-   * For "Requests" => handle modal
+   * Modal for requests
    */
   const [showRequestModal, setShowRequestModal] = useState(false);
-
-  // The data for the chosen request from chain
   const [requestData, setRequestData] = useState<{
     newName: string;
     newThumbnail: string;
@@ -190,9 +206,52 @@ export default function Mypage() {
     executed: boolean;
     approvalCount: string;
   } | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedTx, setCopiedTx] = useState<string>('');
+  const [checkingWallet, setCheckingWallet] = useState(true);
+
+  useEffect(() => {
+    if (checkingWallet) {
+      setTimeout(() => setCheckingWallet(false), 500); // 약간의 지연으로 자연스럽게 처리
+    }
+  }, [checkingWallet]);
+
+  useEffect(() => {
+    if (!checkingWallet && !isConnected && openConnectModal) {
+      openConnectModal();
+    }
+  }, [isConnected, openConnectModal, checkingWallet]);
+
+  if (checkingWallet) {
+    return (
+      <div>
+        <Header />
+        <div className='flex h-screen flex-col items-center justify-center text-white'>
+          <Spinner />
+          <p className='mt-3 font-mono text-sm'>
+            Checking wallet connection...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div>
+        <Header />
+        <div className='flex h-screen flex-col items-center justify-center text-white'>
+          <Spinner />
+          <p className='mt-3 font-mono text-sm'>
+            Please connect your wallet to access this page...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   /**
-   * "Requests" => open modal & fetch chain data
+   * Handle request item click => open modal
    */
   const handleRequestClick = async (requestId: string) => {
     setShowRequestModal(true);
@@ -210,7 +269,7 @@ export default function Mypage() {
   };
 
   /**
-   * isImmutableOrPerm
+   * isImmutableOrPerm => ownership check
    */
   const isImmutableOrPerm = (() => {
     if (!selectedPage) return false;
@@ -220,7 +279,9 @@ export default function Mypage() {
     return isPerm || isImm;
   })();
 
-  // Loading states
+  /**
+   * Loading states
+   */
   if (myDeploymentsLoading || allPagesLoading) {
     return (
       <div className='text-neon-pink flex h-screen flex-col items-center justify-center'>
@@ -252,30 +313,38 @@ export default function Mypage() {
     );
   }
 
-  // Planet attributes
+  /**
+   * planet attributes
+   */
   const selectedFile = selectedPageId
     ? generatePlanetAttributes(selectedPageId)
     : null;
 
-  // 주소 축약 함수
-  const shortenAddress = (address: string) => {
-    return `${address.slice(0, 6)} ... ${address.slice(-4)}`;
+  /**
+   * shortenAddress => (0xABCD...1234) style
+   */
+  const shortenAddress = (addr: string) => {
+    return `${addr.slice(0, 6)} ... ${addr.slice(-4)}`;
   };
 
-  // 클립보드 복사 함수
-  const copyToClipboard = (address: string, index: number) => {
-    navigator.clipboard.writeText(address);
-    setCopiedIndex(index); // 복사된 인덱스 저장
-    toast.success('Address copied!'); // 사용자 피드백 (선택 사항)
-    setTimeout(() => setCopiedIndex(null), 1500); // 1.5초 후 원래 상태로
+  /**
+   * copyToClipboard => store index for short time
+   */
+  const copyToClipboard = (addr: string, index: number) => {
+    navigator.clipboard.writeText(addr);
+    setCopiedIndex(index);
+    toast.success('Address copied!');
+    setTimeout(() => setCopiedIndex(null), 1500);
   };
 
-  // 클립보드 복사 함수
+  /**
+   * copyTxToClipboard => store tx for short time
+   */
   const copyTxToClipboard = (tx: string) => {
     navigator.clipboard.writeText(tx);
     setCopiedTx(tx);
-    toast.success('Transaction copied!'); // 사용자 피드백 (선택 사항)
-    setTimeout(() => setCopiedTx(''), 1500); // 1.5초 후 원래 상태로
+    toast.success('Transaction copied!');
+    setTimeout(() => setCopiedTx(''), 1500);
   };
 
   return (
@@ -355,12 +424,9 @@ export default function Mypage() {
                       className='group flex items-center gap-2'
                       onClick={() => copyToClipboard(owner, idx)}
                     >
-                      {/* 주소 */}
                       <span className='cursor-pointer transition hover:text-blue-400'>
                         {shortenAddress(owner)}
                       </span>
-
-                      {/* 복사 버튼 */}
                       <button className='pb-1 opacity-50 transition group-hover:opacity-100'>
                         {copiedIndex === idx ? (
                           <Check size={16} className='text-green-400' />
