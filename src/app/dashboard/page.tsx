@@ -212,7 +212,7 @@ export default function Mypage() {
 
   useEffect(() => {
     if (checkingWallet) {
-      setTimeout(() => setCheckingWallet(false), 500); // 약간의 지연으로 자연스럽게 처리
+      setTimeout(() => setCheckingWallet(false), 800);
     }
   }, [checkingWallet]);
 
