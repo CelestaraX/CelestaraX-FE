@@ -691,9 +691,14 @@ export default function DashboardPage() {
           </div>
 
           {/* Middle: iframe preview */}
-          <div className='border-neon-pink mb-10 flex h-[500px] w-[600px] max-w-4xl items-center justify-center border bg-white shadow-[0_0_15px_rgba(255,0,255,0.4)]'>
+          <div className='border-neon-pink relative mb-10 flex h-[500px] w-[600px] max-w-4xl items-center justify-center overflow-hidden border bg-white shadow-[0_0_15px_rgba(255,0,255,0.4)]'>
             {selectedHtml ? (
-              <iframe className='h-full w-full' srcDoc={selectedHtml} />
+              <div className='relative h-full w-full'>
+                <iframe
+                  className='absolute left-1/2 top-1/2 h-[1000px] w-[1200px] origin-center -translate-x-1/2 -translate-y-1/2 scale-[0.5]'
+                  srcDoc={selectedHtml}
+                />
+              </div>
             ) : myDeploymentsData?.pages?.length ? (
               <span className='text-neon-pink'>Select a page to preview</span>
             ) : (
