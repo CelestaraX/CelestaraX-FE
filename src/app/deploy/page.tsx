@@ -458,15 +458,6 @@ export default function DeployPage() {
       return;
     }
 
-    if (field === 'fee') {
-      updateForm({
-        ...formData,
-        fee: `${ethers.parseEther(`${value}`)}`,
-      });
-
-      return;
-    }
-
     // Otherwise it's normal text
     updateForm({ ...formData, [field]: value || '' });
   };
@@ -558,9 +549,9 @@ export default function DeployPage() {
       // If ownershipIndex=2 => permissionless => no owners/threshold needed
 
       // fee
-      let updateFee = 0;
+      let updateFee: bigint = BigInt(0);
       if (!isFeeDisabled) {
-        updateFee = parseInt(formData.fee, 10) || 0;
+        updateFee = formData.fee ? ethers.parseEther(formData.fee) : BigInt(0);
       }
 
       // simulate

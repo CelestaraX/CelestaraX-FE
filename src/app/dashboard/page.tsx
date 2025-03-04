@@ -329,10 +329,13 @@ export default function DashboardPage() {
   const [reqPage, setReqPage] = useState(1);
 
   const DEP_PER_PAGE = 5;
-  const REQ_PER_PAGE = 3;
+  const REQ_PER_PAGE = 2;
 
   // My Deployments pagination
-  const deploymentsList = myDeploymentsData?.pages || [];
+  const deploymentsList = useMemo(
+    () => myDeploymentsData?.pages || [],
+    [myDeploymentsData],
+  );
   const totalDepPages = Math.ceil(deploymentsList.length / DEP_PER_PAGE);
 
   const pagedDeployments = useMemo(() => {
