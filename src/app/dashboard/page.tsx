@@ -9,22 +9,20 @@ import { Planet } from './_components/Planet'; // Adjust import path
 import Header from '@/components/layout/Header'; // Adjust import path
 import { toast } from 'react-hot-toast';
 
-// We add GET_PAGE_CREATEDS as "GET_ALL_PAGES" to fetch all pages for ranking
 import {
   GET_PAGES_BY_OWNER,
   GET_PAGE_UPDATES,
   GET_PAGE_CREATEDS as GET_ALL_PAGES,
-} from '@/lib/graphql/queries'; // Adjust path
+} from '@/lib/graphql/queries';
 
-// --------- NEW IMPORTS: for blockchain interactions (approveRequest) ----------
 import {
   fetchPageDataFromContract,
   fetchUpdateRequestFromContract,
-  approveUpdateRequestOnContract, // We'll add this in blockchain.ts
+  approveUpdateRequestOnContract,
 } from '@/lib/blockchain';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Clipboard, X } from 'lucide-react';
+import { Check, Clipboard, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageCreated } from '@/types';
 import { ethers } from 'ethers';
 
@@ -64,8 +62,7 @@ function safeNum(val?: string | null) {
 }
 
 /**
- * Spinner:
- * A small loading indicator.
+ * Small loading indicator
  */
 function Spinner() {
   return (
@@ -94,17 +91,20 @@ function Spinner() {
 
 /**
  * generatePlanetAttributes:
- * Generates color, size, rotation for 3D planet based on pageId.
+ * - color: ~hash-based
+ * - planetSize: fixed=2
+ * - rotationSpeed: ~hash-based
+ * - geometries: (hash % 6)
  */
 function generatePlanetAttributes(id: string) {
-  const hashCode = (str: string) => {
-    return str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  };
+  const hashCode = (str: string) =>
+    str.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const numericId = hashCode(id);
   return {
     color: `#${((numericId * 9973) % 0xffffff).toString(16).padStart(6, '0')}`,
     planetSize: 2,
     rotationSpeed: (numericId % 5) * 0.3 + 0.5,
+    geometries: numericId % 6, // 0~5
   };
 }
 
@@ -115,9 +115,7 @@ export default function DashboardPage() {
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
 
-  /**
-   * Queries: My Deployments & All Pages (for ranking)
-   */
+  /** My Deployments & All Pages */
   const {
     data: myDeploymentsData,
     loading: myDeploymentsLoading,
@@ -133,13 +131,11 @@ export default function DashboardPage() {
     error: allPagesError,
   } = useQuery<{ pages: PageCreated[] }>(GET_ALL_PAGES);
 
-  /**
-   * Local state for selected page and HTML
-   */
+  /** Local state for selection & HTML */
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedHtml, setSelectedHtml] = useState<string | null>(null);
 
-  // Requests data
+  /** Query for requests from subgraph */
   const {
     data: requestsData,
     loading: requestsLoading,
@@ -152,45 +148,38 @@ export default function DashboardPage() {
     skip: !selectedPageId,
   });
 
-  /**
-   * selectedPage => whichever user chose from My Deployments
-   */
+  /** selectedPage => from myDeployments */
   const selectedPage = useMemo(() => {
     if (!myDeploymentsData?.pages || !selectedPageId) return null;
     return myDeploymentsData.pages.find((p) => p.pageId === selectedPageId);
   }, [myDeploymentsData, selectedPageId]);
 
-  /**
-   * Auto-select the first if none chosen
-   */
+  /** auto-select first page if none chosen */
   useEffect(() => {
     if (!selectedPageId && myDeploymentsData?.pages?.length) {
       setSelectedPageId(myDeploymentsData.pages[0].pageId);
     }
   }, [myDeploymentsData, selectedPageId]);
 
-  /**
-   * Fetch HTML from contract for chosen page
-   */
+  /** fetch HTML from chain */
   useEffect(() => {
     if (!selectedPageId) {
       setSelectedHtml(null);
       return;
     }
-    fetchPageDataFromContract(selectedPageId).then((html) => {
-      setSelectedHtml(html);
-    });
+    fetchPageDataFromContract(selectedPageId).then(setSelectedHtml);
   }, [selectedPageId]);
 
   /**
-   * rankMap => compute rank by likes among all pages
+   * rankMap => compute rank by (likes - dislikes) desc
+   * So that top rank = highest (likes - dislikes).
    */
   const rankMap = useMemo(() => {
     if (!allPagesData?.pages) return {};
     const sorted = [...allPagesData.pages].sort((a, b) => {
-      const aLikes = safeNum(a.totalLikes);
-      const bLikes = safeNum(b.totalLikes);
-      return bLikes - aLikes; // desc
+      const scoreA = safeNum(a.totalLikes) - safeNum(a.totalDislikes);
+      const scoreB = safeNum(b.totalLikes) - safeNum(b.totalDislikes);
+      return scoreB - scoreA; // DESC
     });
     const map: Record<string, number> = {};
     sorted.forEach((p, idx) => {
@@ -200,8 +189,122 @@ export default function DashboardPage() {
   }, [allPagesData]);
 
   /**
-   * Modal for requests
+   * #1: We only want executed=false requests from chain,
+   * so let's store them in chainRequests after we fetch subgraph requestsData.
    */
+  const [chainRequests, setChainRequests] = useState<
+    { requestId: string; requester: string }[]
+  >([]);
+
+  /** We show spinner while chainRequests is being loaded => new local state */
+  const [chainRequestsLoading, setChainRequestsLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (!selectedPageId) {
+        setChainRequests([]);
+        return;
+      }
+      // We start loading
+      setChainRequestsLoading(true);
+
+      if (!requestsData?.pages || requestsData.pages.length === 0) {
+        setChainRequests([]);
+        setChainRequestsLoading(false);
+        return;
+      }
+
+      const subgraphReqs = requestsData.pages[0].updateRequests || [];
+      const results: { requestId: string; requester: string }[] = [];
+
+      for (const req of subgraphReqs) {
+        const chainData = await fetchUpdateRequestFromContract(
+          selectedPageId,
+          req.requestId,
+        );
+        if (chainData && chainData.executed === false) {
+          results.push({ requestId: req.requestId, requester: req.requester });
+        }
+      }
+      setChainRequests(results);
+      setChainRequestsLoading(false);
+    })();
+  }, [requestsData, selectedPageId]);
+
+  /**
+   * #2 => My Deployments에 "Requests" column: # of executed=false
+   * We'll do a separate effect that queries each page's requests,
+   * filter out executed=true, count them, store in requestsCountMap.
+   */
+  const [requestsCountMap, setRequestsCountMap] = useState<
+    Record<string, number>
+  >({});
+  /** show spinner for requestsCount as well => local state */
+  const [requestsCountLoading, setRequestsCountLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (!myDeploymentsData?.pages) return;
+      // start spinner
+      setRequestsCountLoading(true);
+
+      const newMap: Record<string, number> = {};
+
+      for (const page of myDeploymentsData.pages) {
+        // We'll do a subgraph fetch for that page to get all requests
+        let requestsFromSubgraph: UpdateRequestSubgraph[] = [];
+        try {
+          const url = process.env.NEXT_PUBLIC_API_URL;
+          if (!url) throw new Error('No NEXT_PUBLIC_API_URL found.');
+
+          const query = `query MyReq($pid: String!) {
+            pages(where: { pageId: $pid }) {
+              updateRequests {
+                requestId
+                requester
+              }
+            }
+          }`;
+          const body = JSON.stringify({
+            query,
+            variables: { pid: page.pageId },
+          });
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+          });
+          const json = await resp.json();
+
+          if (json.data?.pages?.length) {
+            requestsFromSubgraph = json.data.pages[0].updateRequests;
+          }
+        } catch (err) {
+          console.error('Error fetching subgraph for page:', page.pageId, err);
+          requestsFromSubgraph = [];
+        }
+
+        // Now check on-chain for each request -> executed?
+        let count = 0;
+        for (const req of requestsFromSubgraph) {
+          const chainData = await fetchUpdateRequestFromContract(
+            page.pageId,
+            req.requestId,
+          );
+          if (chainData && chainData.executed === false) {
+            count++;
+          }
+        }
+
+        newMap[page.pageId] = count;
+      }
+
+      setRequestsCountMap(newMap);
+      setRequestsCountLoading(false);
+    })();
+  }, [myDeploymentsData]);
+
+  /** Request modal states */
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestData, setRequestData] = useState<{
     newName: string;
@@ -214,29 +317,62 @@ export default function DashboardPage() {
     null,
   );
 
-  /**
-   * copy states
-   */
+  /** copy states */
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedTx, setCopiedTx] = useState<string>('');
+  const [copiedId, setCopiedId] = useState<string>('');
   const [checkingWallet, setCheckingWallet] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
 
-  // For wallet check (if needed)
+  /** #4 Pagination states: myDeployments(5 per page), requests(3 per page) */
+  const [myDepPage, setMyDepPage] = useState(1);
+  const [reqPage, setReqPage] = useState(1);
+
+  const DEP_PER_PAGE = 5;
+  const REQ_PER_PAGE = 3;
+
+  // My Deployments pagination
+  const deploymentsList = myDeploymentsData?.pages || [];
+  const totalDepPages = Math.ceil(deploymentsList.length / DEP_PER_PAGE);
+
+  const pagedDeployments = useMemo(() => {
+    const start = (myDepPage - 1) * DEP_PER_PAGE;
+    const end = start + DEP_PER_PAGE;
+    return deploymentsList.slice(start, end);
+  }, [deploymentsList, myDepPage]);
+
+  // Requests pagination (chainRequests => only executed=false)
+  const totalReqPages = Math.ceil(chainRequests.length / REQ_PER_PAGE);
+  const pagedRequests = useMemo(() => {
+    const start = (reqPage - 1) * REQ_PER_PAGE;
+    const end = start + REQ_PER_PAGE;
+    return chainRequests.slice(start, end);
+  }, [chainRequests, reqPage]);
+
+  /** isImmutableOrPerm => block approvals */
+  const isImmutableOrPerm = useMemo(() => {
+    if (!selectedPage) return false;
+    const ownerNum = selectedPage.ownershipType ?? -1;
+    const isPerm = ownerNum === 2;
+    const isImm = selectedPage.imt ?? false;
+    return isPerm || isImm;
+  }, [selectedPage]);
+
+  // For wallet check
   useEffect(() => {
     if (checkingWallet) {
       setTimeout(() => setCheckingWallet(false), 800);
     }
   }, [checkingWallet]);
 
-  // If not connected, optionally open modal
+  // If not connected => open modal (optional)
   useEffect(() => {
     if (!checkingWallet && !isConnected && openConnectModal) {
       openConnectModal();
     }
   }, [isConnected, openConnectModal, checkingWallet]);
 
-  // If still checking wallet
+  // If still checking
   if (checkingWallet) {
     return (
       <div>
@@ -251,7 +387,7 @@ export default function DashboardPage() {
     );
   }
 
-  // If not connected => block the page
+  // If not connected => block
   if (!isConnected) {
     return (
       <div>
@@ -272,7 +408,10 @@ export default function DashboardPage() {
   const handleRequestClick = async (requestId: string) => {
     setShowRequestModal(true);
     setSelectedRequestId(requestId);
+    setRequestData(null); // Clear old data while loading
+
     if (!selectedPageId) return;
+    // Spinner-like approach => re-fetch from chain
     const data = await fetchUpdateRequestFromContract(
       selectedPageId,
       requestId,
@@ -286,39 +425,76 @@ export default function DashboardPage() {
     setRequestData(null);
   };
 
-  /**
-   * isImmutableOrPerm => ownership check
-   */
-  const isImmutableOrPerm = (() => {
-    if (!selectedPage) return false;
-    const ownerNum = selectedPage.ownershipType ?? -1;
-    const isPerm = ownerNum === 2;
-    const isImm = selectedPage.imt ?? false;
-    return isPerm || isImm;
-  })();
-
-  /**
-   * Approve logic
-   */
+  /** Approve logic */
   const handleApprove = async () => {
     if (!selectedPageId || !selectedRequestId) return;
     try {
       setIsApproving(true);
-      const txReceipt = await approveUpdateRequestOnContract(
-        selectedPageId,
-        selectedRequestId,
-      );
+      await approveUpdateRequestOnContract(selectedPageId, selectedRequestId);
       toast.success('Approved request!');
-      console.log('Approve TX receipt:', txReceipt);
 
-      // After success, refetch requests
+      // refetch subgraph
       refetchRequests();
-      // update local state for request data (fetch again)
+
+      // re-fetch chain data => update modal
       const updatedData = await fetchUpdateRequestFromContract(
         selectedPageId,
         selectedRequestId,
       );
       if (updatedData) setRequestData(updatedData);
+
+      // re-fetch the requestsCountMap as well
+      // (not super optimal to do one by one => but for demonstration)
+      setRequestsCountLoading(true);
+      const newMap = { ...requestsCountMap };
+      // Re-check this page's requests
+      // We do a mini subgraph fetch (like above).
+      let requestsFromSubgraph: UpdateRequestSubgraph[] = [];
+      try {
+        const url = process.env.NEXT_PUBLIC_API_URL;
+        if (url) {
+          const query = `query MyReq($pid: String!) {
+            pages(where: { pageId: $pid }) {
+              updateRequests {
+                requestId
+                requester
+              }
+            }
+          }`;
+          const body = JSON.stringify({
+            query,
+            variables: { pid: selectedPageId },
+          });
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+          });
+          const json = await resp.json();
+          if (json.data?.pages?.length) {
+            requestsFromSubgraph = json.data.pages[0].updateRequests;
+          }
+        }
+      } catch (err) {
+        console.error(
+          'Error re-fetching subgraph for page:',
+          selectedPageId,
+          err,
+        );
+      }
+      let count = 0;
+      for (const req of requestsFromSubgraph) {
+        const chainData = await fetchUpdateRequestFromContract(
+          selectedPageId,
+          req.requestId,
+        );
+        if (chainData && chainData.executed === false) {
+          count++;
+        }
+      }
+      newMap[selectedPageId] = count;
+      setRequestsCountMap(newMap);
+      setRequestsCountLoading(false);
 
       setIsApproving(false);
     } catch (err) {
@@ -328,9 +504,26 @@ export default function DashboardPage() {
     }
   };
 
-  /**
-   * Loading states
-   */
+  /** shortenAddress => (0xABCD...1234) */
+  const shortenAddress = (addr: string) =>
+    `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+  const copyToClipboard = (addr: string, index: number) => {
+    navigator.clipboard.writeText(addr);
+    setCopiedIndex(index);
+    toast.success('Address copied!');
+    setTimeout(() => setCopiedIndex(null), 1500);
+  };
+
+  const copyTxToClipboard = (id: string, tx: string) => {
+    navigator.clipboard.writeText(tx);
+    setCopiedTx(tx);
+    setCopiedId(id);
+    toast.success('Transaction copied!');
+    setTimeout(() => setCopiedTx(''), 1500);
+  };
+
+  /** Subgraph loading states for MyDeployments & AllPages */
   if (myDeploymentsLoading || allPagesLoading) {
     return (
       <div className='text-neon-pink flex h-screen flex-col items-center justify-center'>
@@ -362,39 +555,10 @@ export default function DashboardPage() {
     );
   }
 
-  /**
-   * planet attributes
-   */
+  /** planet config for selected page */
   const selectedFile = selectedPageId
     ? generatePlanetAttributes(selectedPageId)
     : null;
-
-  /**
-   * shortenAddress => (0xABCD...1234) style
-   */
-  const shortenAddress = (addr: string) => {
-    return `${addr.slice(0, 6)} ... ${addr.slice(-4)}`;
-  };
-
-  /**
-   * copyToClipboard => store index for short time
-   */
-  const copyToClipboard = (addr: string, index: number) => {
-    navigator.clipboard.writeText(addr);
-    setCopiedIndex(index);
-    toast.success('Address copied!');
-    setTimeout(() => setCopiedIndex(null), 1500);
-  };
-
-  /**
-   * copyTxToClipboard => store tx for short time
-   */
-  const copyTxToClipboard = (tx: string) => {
-    navigator.clipboard.writeText(tx);
-    setCopiedTx(tx);
-    toast.success('Transaction copied!');
-    setTimeout(() => setCopiedTx(''), 1500);
-  };
 
   return (
     <div className='min-h-screen'>
@@ -413,14 +577,14 @@ export default function DashboardPage() {
                     key={selectedPageId}
                     rotationSpeed={selectedFile.rotationSpeed}
                     planetSize={selectedFile.planetSize}
-                    geometries={5}
+                    geometries={selectedFile.geometries}
                     color={selectedFile.color}
                   />
                 )}
               </Canvas>
             </div>
 
-            {/* PageId (replacing #ID => #PageId) */}
+            {/* PageId info */}
             <div className='text-neon-pink mt-2 text-xs'>
               {selectedPageId ? `#PageId: ${selectedPageId}` : '#PageId: N/A'}
             </div>
@@ -474,7 +638,7 @@ export default function DashboardPage() {
                       onClick={() => copyToClipboard(owner, idx)}
                     >
                       <span className='cursor-pointer transition hover:text-blue-400'>
-                        {shortenAddress(owner)}
+                        {owner.slice(0, 6)}...{owner.slice(-4)}
                       </span>
                       <button className='pb-1 opacity-50 transition group-hover:opacity-100'>
                         {copiedIndex === idx ? (
@@ -493,7 +657,7 @@ export default function DashboardPage() {
 
             <div className='border-b border-pink-500 pb-3' />
 
-            {/* Moved Update Fee here */}
+            {/* Update Fee */}
             <div className='text-neon-pink pt-3 font-bold'>Update Fee:</div>
             <div className='mb-2 font-semibold text-green-400'>
               <span>
@@ -507,8 +671,9 @@ export default function DashboardPage() {
             <div className='text-neon-pink font-bold'>Balance:</div>
             <div className='mb-2'>
               <span className='font-semibold text-green-400'>
-                {ethers.formatEther(BigInt(safeNum(selectedPage?.balance))) ??
-                  '0'}
+                {selectedPage
+                  ? ethers.formatEther(BigInt(safeNum(selectedPage.balance)))
+                  : '0'}
               </span>
               <span className='pl-3 text-xs text-gray-400'>Eth</span>
             </div>
@@ -527,7 +692,7 @@ export default function DashboardPage() {
 
           {/* Bottom: My Deployments + Requests */}
           <div className='mt-6 flex w-full max-w-6xl space-x-6'>
-            {/* Left - My Deployments (with Rank column) */}
+            {/* Left - My Deployments (with Rank column & requests count) */}
             <div className='border-neon-pink flex-1 border p-4'>
               <h2 className='text-neon-pink mb-3 text-lg font-bold'>
                 My Deployments
@@ -539,8 +704,6 @@ export default function DashboardPage() {
                   <span>Loading My Deployments...</span>
                 </div>
               )}
-
-              {/* If no pages */}
               {myDeploymentsData?.pages?.length === 0 &&
                 !myDeploymentsLoading && (
                   <p className='text-sm text-gray-300'>
@@ -549,58 +712,108 @@ export default function DashboardPage() {
                 )}
 
               {myDeploymentsData?.pages?.length ? (
-                <table className='w-full border-collapse text-sm text-white'>
-                  <thead>
-                    <tr className='border-neon-pink text-neon-pink border-b'>
-                      <th className='p-2 text-left'>Name</th>
-                      <th className='p-2 text-left'>PageId</th>
-                      <th className='p-2 text-left'>Ownership</th>
-                      <th className='p-2 text-left'>Rank</th>
-                      <th className='p-2 text-left'>Immutable</th>
-                      <th className='p-2 text-left'>Likes</th>
-                      <th className='p-2 text-left'>Dislikes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {myDeploymentsData.pages.map((page) => {
-                      const ownershipStr = parseOwnershipType(
-                        page.ownershipType,
-                      );
-                      const isSelected = selectedPageId === page.pageId;
-                      const rankVal = rankMap[page.pageId]
-                        ? `#${rankMap[page.pageId]}`
-                        : '--';
+                <>
+                  <table className='w-full border-collapse text-sm text-white'>
+                    <thead>
+                      <tr className='border-neon-pink text-neon-pink border-b'>
+                        <th className='p-2 text-left'>Name</th>
+                        <th className='p-2 text-left'>PageId</th>
+                        <th className='p-2 text-left'>Ownership</th>
+                        <th className='p-2 text-left'>Rank</th>
+                        <th className='p-2 text-left'>Immutable</th>
+                        <th className='p-2 text-left'>Likes</th>
+                        <th className='p-2 text-left'>Dislikes</th>
+                        <th className='p-2 text-left'>Requests</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedDeployments.map((page) => {
+                        const ownershipStr = parseOwnershipType(
+                          page.ownershipType,
+                        );
+                        const isSelected = selectedPageId === page.pageId;
+                        const rankVal = rankMap[page.pageId]
+                          ? `#${rankMap[page.pageId]}`
+                          : '--';
 
-                      return (
-                        <tr
-                          key={page.id}
-                          className={`cursor-pointer border-b border-gray-700 hover:bg-gray-800 ${
-                            isSelected ? 'bg-gray-800' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedPageId(page.pageId);
-                          }}
-                        >
-                          <td className='p-2 text-cyan-300'>{page.name}</td>
-                          <td className='p-2'>{page.pageId}</td>
-                          <td className='p-2'>{ownershipStr}</td>
-                          <td className='p-2 text-yellow-400'>{rankVal}</td>
-                          <td className='p-2'>{page.imt ? 'True' : 'False'}</td>
-                          <td className='p-2 text-green-400'>
-                            {safeNum(page.totalLikes)}
-                          </td>
-                          <td className='p-2 text-red-400'>
-                            {safeNum(page.totalDislikes)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        // requestsCountMap => how many executed=false
+                        const notExecutedCount =
+                          requestsCountMap[page.pageId] || 0;
+
+                        return (
+                          <tr
+                            key={page.id}
+                            className={`cursor-pointer border-b border-gray-700 hover:bg-gray-800 ${
+                              isSelected ? 'bg-gray-800' : ''
+                            }`}
+                            onClick={() => {
+                              setSelectedPageId(page.pageId);
+                            }}
+                          >
+                            <td className='p-2 text-cyan-300'>{page.name}</td>
+                            <td className='p-2'>{page.pageId}</td>
+                            <td className='p-2'>{ownershipStr}</td>
+                            <td className='p-2 text-yellow-400'>{rankVal}</td>
+                            <td className='p-2'>
+                              {page.imt ? 'True' : 'False'}
+                            </td>
+                            <td className='p-2 text-green-400'>
+                              {safeNum(page.totalLikes)}
+                            </td>
+                            <td className='p-2 text-red-400'>
+                              {safeNum(page.totalDislikes)}
+                            </td>
+                            <td className='p-2 text-purple-400'>
+                              {/* If requestsCountLoading => show spinner */}
+                              {requestsCountLoading ? (
+                                <div className='flex items-center gap-2'>
+                                  <Spinner />
+                                </div>
+                              ) : (
+                                notExecutedCount
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {/** Pagination controls for MyDeployments */}
+                  <div className='mt-3 flex items-center justify-center gap-4 text-white'>
+                    <motion.button
+                      disabled={myDepPage <= 1}
+                      className={`rounded-full p-2 ${
+                        myDepPage > 1
+                          ? 'border border-pink-500 text-pink-200 hover:bg-pink-500 hover:text-white'
+                          : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                      }`}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setMyDepPage((p) => p - 1)}
+                    >
+                      <ChevronLeft size={20} />
+                    </motion.button>
+                    <span className='text-sm'>
+                      Page {myDepPage} / {totalDepPages}
+                    </span>
+                    <motion.button
+                      disabled={myDepPage >= totalDepPages}
+                      className={`rounded-full p-2 ${
+                        myDepPage < totalDepPages
+                          ? 'border border-pink-500 text-pink-200 hover:bg-pink-500 hover:text-white'
+                          : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                      }`}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setMyDepPage((p) => p + 1)}
+                    >
+                      <ChevronRight size={20} />
+                    </motion.button>
+                  </div>
+                </>
               ) : null}
             </div>
 
-            {/* Right - Requests */}
+            {/* Right - Requests (executed=false only) + pagination */}
             <div className='border-neon-pink w-[300px] border p-4'>
               <h2 className='text-neon-pink mb-3 text-lg font-bold'>
                 Requests
@@ -623,7 +836,8 @@ export default function DashboardPage() {
 
               {!isImmutableOrPerm && selectedPageId && (
                 <>
-                  {requestsLoading && (
+                  {/* If subgraph is loading the requests or we are chainRequestsLoading, show spinner */}
+                  {(requestsLoading || chainRequestsLoading) && (
                     <div className='flex items-center gap-2 text-white'>
                       <Spinner />
                       <span>Loading requests...</span>
@@ -635,57 +849,84 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {requestsData?.pages && requestsData.pages.length > 0 ? (
+                  {/* chainRequests => only executed=false => pagedRequests */}
+                  {pagedRequests.length > 0 ? (
                     <>
-                      {requestsData.pages[0].updateRequests.length === 0 ? (
-                        <p className='text-sm text-gray-400'>
-                          No update requests found.
-                        </p>
-                      ) : (
-                        <ul className='space-y-2'>
-                          {requestsData.pages[0].updateRequests.map((req) => (
-                            <li
-                              key={req.requestId}
-                              className='flex cursor-pointer flex-col border-b border-gray-300 py-1 text-cyan-300 hover:bg-gray-800'
-                              onClick={() => handleRequestClick(req.requestId)}
-                            >
-                              <div>
-                                <div className='pb-3 text-sm'>
-                                  Name: {requestsData.pages[0].name || 'N/A'}
-                                </div>
+                      <ul className='space-y-2'>
+                        {pagedRequests.map((req) => (
+                          <li
+                            key={req.requestId}
+                            className='flex cursor-pointer flex-col border-b border-gray-300 py-1 text-cyan-300 hover:bg-gray-800'
+                            onClick={() => handleRequestClick(req.requestId)}
+                          >
+                            <div>
+                              <div className='pb-3 text-sm'>
+                                Name: {selectedPage?.name || 'N/A'}
                               </div>
-                              <div className='text-xs text-gray-300'>
-                                <div>
-                                  PageId: {requestsData.pages[0].pageId}
-                                </div>
-                                <div>ReqID: {req.requestId}</div>
-                                <div
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyTxToClipboard(req.requester);
-                                  }}
-                                  className='flex gap-2 pb-1'
-                                >
-                                  By: {shortenAddress(req.requester)}
-                                  {copiedTx === req.requester ? (
-                                    <Check
-                                      size={16}
-                                      className='text-green-400'
-                                    />
-                                  ) : (
-                                    <Clipboard size={16} />
-                                  )}
-                                </div>
+                            </div>
+                            <div className='text-xs text-gray-300'>
+                              <div>PageId: {selectedPageId}</div>
+                              <div>ReqID: {req.requestId}</div>
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyTxToClipboard(
+                                    req.requestId,
+                                    req.requester,
+                                  );
+                                }}
+                                className='flex gap-2 pb-1'
+                              >
+                                By: {shortenAddress(req.requester)}
+                                {copiedTx === req.requester &&
+                                copiedId === req.requestId ? (
+                                  <Check size={16} className='text-green-400' />
+                                ) : (
+                                  <Clipboard size={16} />
+                                )}
                               </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      {/** Pagination controls for requests */}
+                      <div className='mt-3 flex items-center justify-center gap-4 text-white'>
+                        <motion.button
+                          disabled={reqPage <= 1}
+                          className={`rounded-full p-2 ${
+                            reqPage > 1
+                              ? 'border border-pink-500 text-pink-200 hover:bg-pink-500 hover:text-white'
+                              : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                          }`}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => setReqPage((p) => p - 1)}
+                        >
+                          <ChevronLeft size={20} />
+                        </motion.button>
+                        <span className='text-sm'>
+                          Page {reqPage} / {totalReqPages}
+                        </span>
+                        <motion.button
+                          disabled={reqPage >= totalReqPages}
+                          className={`rounded-full p-2 ${
+                            reqPage < totalReqPages
+                              ? 'border border-pink-500 text-pink-200 hover:bg-pink-500 hover:text-white'
+                              : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                          }`}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => setReqPage((p) => p + 1)}
+                        >
+                          <ChevronRight size={20} />
+                        </motion.button>
+                      </div>
                     </>
                   ) : (
-                    <p className='text-sm text-gray-300'>
-                      No requests to show.
-                    </p>
+                    !requestsLoading &&
+                    !chainRequestsLoading && (
+                      <p className='text-sm text-gray-400'>
+                        No update requests found.
+                      </p>
+                    )
                   )}
                 </>
               )}
@@ -696,7 +937,7 @@ export default function DashboardPage() {
 
       {/* Modal for a single request */}
       <AnimatePresence>
-        {showRequestModal && selectedPageId && selectedPage && requestData && (
+        {showRequestModal && selectedPageId && selectedPage && (
           <motion.div
             className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4'
             initial={{ opacity: 0 }}
@@ -721,69 +962,80 @@ export default function DashboardPage() {
                 Update Request
               </h2>
 
-              <div className='grid grid-cols-2 gap-6'>
-                {/* Left: existing data */}
-                <div className='border-r border-gray-700 pr-4'>
-                  <h3 className='text-neon-pink mb-2'>Current Page Info</h3>
-                  <div className='space-y-1 text-sm'>
-                    <div>Page Name: {selectedPage.name}</div>
-                    <div>
-                      Thumbnail: {selectedPage.thumbnail?.slice(0, 40) + '...'}
-                    </div>
-                    <div>
-                      Ownership:{' '}
-                      {parseOwnershipType(selectedPage.ownershipType)}
-                    </div>
-                    <div>Balance: {selectedPage.balance}</div>
-                    <div>Current Likes: {selectedPage.totalLikes}</div>
-                    <div>Current Dislikes: {selectedPage.totalDislikes}</div>
-                  </div>
-                  <div className='mt-4 text-sm text-gray-400'>
-                    Existing HTML Preview:
-                  </div>
-                  <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
-                    {selectedHtml}
-                  </div>
+              {/* If requestData not loaded => show spinner */}
+              {!requestData ? (
+                <div className='flex h-full flex-col items-center justify-center'>
+                  <Spinner />
+                  <p className='mt-2 text-sm text-gray-300'>
+                    Loading request details...
+                  </p>
                 </div>
-
-                {/* Right: new update data */}
-                <div>
-                  <h3 className='text-neon-pink mb-2'>Proposed Changes</h3>
-                  <div className='space-y-1 text-sm'>
-                    <div>New Name: {requestData.newName || 'N/A'}</div>
-                    <div>
-                      New Thumbnail:{' '}
-                      {requestData.newThumbnail.slice(0, 40) + '...'}
+              ) : (
+                <div className='grid grid-cols-2 gap-6'>
+                  {/* Left: existing data */}
+                  <div className='border-r border-gray-700 pr-4'>
+                    <h3 className='text-neon-pink mb-2'>Current Page Info</h3>
+                    <div className='space-y-1 text-sm'>
+                      <div>Page Name: {selectedPage.name}</div>
+                      <div>
+                        Thumbnail:{' '}
+                        {selectedPage.thumbnail?.slice(0, 40) + '...'}
+                      </div>
+                      <div>
+                        Ownership:{' '}
+                        {parseOwnershipType(selectedPage.ownershipType)}
+                      </div>
+                      <div>Balance: {selectedPage.balance}</div>
+                      <div>Current Likes: {selectedPage.totalLikes}</div>
+                      <div>Current Dislikes: {selectedPage.totalDislikes}</div>
                     </div>
-                    <div>Executed: {requestData.executed ? 'Yes' : 'No'}</div>
-                    <div>Approvals: {requestData.approvalCount}</div>
-                  </div>
-                  <div className='mt-4 text-sm text-gray-400'>
-                    Proposed HTML Preview:
-                  </div>
-                  <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
-                    {requestData.newHtml}
+                    <div className='mt-4 text-sm text-gray-400'>
+                      Existing HTML Preview:
+                    </div>
+                    <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
+                      {selectedHtml}
+                    </div>
                   </div>
 
-                  {/* If Single or MultiSig => can Approve */}
-                  {!isImmutableOrPerm && !requestData.executed && (
-                    <button
-                      className='text-md ml-[370px] mt-4 h-[45px] w-[100px] rounded-md bg-gray-700 font-mono font-semibold text-gray-200 hover:bg-gray-600'
-                      onClick={handleApprove}
-                      disabled={isApproving}
-                    >
-                      {isApproving ? (
-                        <div>
-                          <Spinner />
-                          Approve
-                        </div>
-                      ) : (
-                        'Approve'
-                      )}
-                    </button>
-                  )}
+                  {/* Right: new update data */}
+                  <div>
+                    <h3 className='text-neon-pink mb-2'>Proposed Changes</h3>
+                    <div className='space-y-1 text-sm'>
+                      <div>New Name: {requestData.newName || 'N/A'}</div>
+                      <div>
+                        New Thumbnail:{' '}
+                        {requestData.newThumbnail.slice(0, 40) + '...'}
+                      </div>
+                      <div>Executed: {requestData.executed ? 'Yes' : 'No'}</div>
+                      <div>Approvals: {requestData.approvalCount}</div>
+                    </div>
+                    <div className='mt-4 text-sm text-gray-400'>
+                      Proposed HTML Preview:
+                    </div>
+                    <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
+                      {requestData.newHtml}
+                    </div>
+
+                    {/* If Single or MultiSig => can Approve */}
+                    {!isImmutableOrPerm && !requestData.executed && (
+                      <button
+                        className='text-md ml-[370px] mt-4 h-[45px] w-[100px] rounded-md bg-gray-700 font-mono font-semibold text-gray-200 hover:bg-gray-600'
+                        onClick={handleApprove}
+                        disabled={isApproving}
+                      >
+                        {isApproving ? (
+                          <div className='flex items-center gap-2'>
+                            <Spinner />
+                            <span>Approve</span>
+                          </div>
+                        ) : (
+                          'Approve'
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
           </motion.div>
         )}
