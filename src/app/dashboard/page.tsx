@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@apollo/client';
 import { useAccount } from 'wagmi';
-import { useConnectModal } from '@rainbow-me/rainbowkit'; // Added for connect modal
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { Canvas } from '@react-three/fiber';
 import { Planet } from './_components/Planet'; // Adjust import path
 import Header from '@/components/layout/Header'; // Adjust import path
@@ -16,10 +16,13 @@ import {
   GET_PAGE_CREATEDS as GET_ALL_PAGES,
 } from '@/lib/graphql/queries'; // Adjust path
 
+// --------- NEW IMPORTS: for blockchain interactions (approveRequest) ----------
 import {
   fetchPageDataFromContract,
   fetchUpdateRequestFromContract,
-} from '@/lib/blockchain'; // The code from blockchain.ts
+  approveUpdateRequestOnContract, // We'll add this in blockchain.ts
+} from '@/lib/blockchain';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Clipboard, X } from 'lucide-react';
 import { PageCreated } from '@/types';
@@ -105,7 +108,7 @@ function generatePlanetAttributes(id: string) {
   };
 }
 
-export default function Mypage() {
+export default function DashboardPage() {
   /**
    * Wallet connection
    */
@@ -141,6 +144,7 @@ export default function Mypage() {
     data: requestsData,
     loading: requestsLoading,
     error: requestsError,
+    refetch: refetchRequests,
   } = useQuery<{
     pages: (PageCreated & { updateRequests: UpdateRequestSubgraph[] })[];
   }>(GET_PAGE_UPDATES, {
@@ -160,7 +164,7 @@ export default function Mypage() {
    * Auto-select the first if none chosen
    */
   useEffect(() => {
-    if (!selectedPageId && myDeploymentsData?.pages?.[0]) {
+    if (!selectedPageId && myDeploymentsData?.pages?.length) {
       setSelectedPageId(myDeploymentsData.pages[0].pageId);
     }
   }, [myDeploymentsData, selectedPageId]);
@@ -186,7 +190,7 @@ export default function Mypage() {
     const sorted = [...allPagesData.pages].sort((a, b) => {
       const aLikes = safeNum(a.totalLikes);
       const bLikes = safeNum(b.totalLikes);
-      return bLikes - aLikes;
+      return bLikes - aLikes; // desc
     });
     const map: Record<string, number> = {};
     sorted.forEach((p, idx) => {
@@ -206,22 +210,33 @@ export default function Mypage() {
     executed: boolean;
     approvalCount: string;
   } | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
+    null,
+  );
+
+  /**
+   * copy states
+   */
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedTx, setCopiedTx] = useState<string>('');
   const [checkingWallet, setCheckingWallet] = useState(true);
+  const [isApproving, setIsApproving] = useState(false);
 
+  // For wallet check (if needed)
   useEffect(() => {
     if (checkingWallet) {
       setTimeout(() => setCheckingWallet(false), 800);
     }
   }, [checkingWallet]);
 
+  // If not connected, optionally open modal
   useEffect(() => {
     if (!checkingWallet && !isConnected && openConnectModal) {
       openConnectModal();
     }
   }, [isConnected, openConnectModal, checkingWallet]);
 
+  // If still checking wallet
   if (checkingWallet) {
     return (
       <div>
@@ -236,6 +251,7 @@ export default function Mypage() {
     );
   }
 
+  // If not connected => block the page
   if (!isConnected) {
     return (
       <div>
@@ -255,6 +271,7 @@ export default function Mypage() {
    */
   const handleRequestClick = async (requestId: string) => {
     setShowRequestModal(true);
+    setSelectedRequestId(requestId);
     if (!selectedPageId) return;
     const data = await fetchUpdateRequestFromContract(
       selectedPageId,
@@ -265,6 +282,7 @@ export default function Mypage() {
 
   const closeModal = () => {
     setShowRequestModal(false);
+    setSelectedRequestId(null);
     setRequestData(null);
   };
 
@@ -278,6 +296,37 @@ export default function Mypage() {
     const isImm = selectedPage.imt ?? false;
     return isPerm || isImm;
   })();
+
+  /**
+   * Approve logic
+   */
+  const handleApprove = async () => {
+    if (!selectedPageId || !selectedRequestId) return;
+    try {
+      setIsApproving(true);
+      const txReceipt = await approveUpdateRequestOnContract(
+        selectedPageId,
+        selectedRequestId,
+      );
+      toast.success('Approved request!');
+      console.log('Approve TX receipt:', txReceipt);
+
+      // After success, refetch requests
+      refetchRequests();
+      // update local state for request data (fetch again)
+      const updatedData = await fetchUpdateRequestFromContract(
+        selectedPageId,
+        selectedRequestId,
+      );
+      if (updatedData) setRequestData(updatedData);
+
+      setIsApproving(false);
+    } catch (err) {
+      console.error('Error approving request:', err);
+      toast.error('Failed to approve request.');
+      setIsApproving(false);
+    }
+  };
 
   /**
    * Loading states
@@ -438,9 +487,7 @@ export default function Mypage() {
                   ))}
                 </ul>
               ) : (
-                <div className='text-xs text-gray-300'>
-                  No owners (maybe permissionless?)
-                </div>
+                <div className='text-xs text-gray-300'>No owners</div>
               )}
             </div>
 
@@ -471,8 +518,10 @@ export default function Mypage() {
           <div className='border-neon-pink mb-10 flex h-[600px] w-[600px] max-w-4xl items-center justify-center overflow-hidden border bg-white shadow-[0_0_15px_rgba(255,0,255,0.4)]'>
             {selectedHtml ? (
               <iframe className='h-full w-full' srcDoc={selectedHtml} />
-            ) : (
+            ) : myDeploymentsData?.pages?.length ? (
               <span className='text-neon-pink'>Select a page to preview</span>
+            ) : (
+              <span className='text-neon-pink'>No pages available</span>
             )}
           </div>
 
@@ -483,64 +532,72 @@ export default function Mypage() {
               <h2 className='text-neon-pink mb-3 text-lg font-bold'>
                 My Deployments
               </h2>
+
               {myDeploymentsLoading && (
                 <div className='flex items-center gap-2 text-white'>
                   <Spinner />
                   <span>Loading My Deployments...</span>
                 </div>
               )}
-              {myDeploymentsData?.pages?.length === 0 && (
-                <p className='text-sm text-gray-300'>
-                  No pages found for your address.
-                </p>
-              )}
 
-              <table className='w-full border-collapse text-sm text-white'>
-                <thead>
-                  <tr className='border-neon-pink text-neon-pink border-b'>
-                    <th className='p-2 text-left'>Name</th>
-                    <th className='p-2 text-left'>PageId</th>
-                    <th className='p-2 text-left'>Ownership</th>
-                    <th className='p-2 text-left'>Rank</th>
-                    <th className='p-2 text-left'>Immutable</th>
-                    <th className='p-2 text-left'>Likes</th>
-                    <th className='p-2 text-left'>Dislikes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {myDeploymentsData?.pages?.map((page) => {
-                    const ownershipStr = parseOwnershipType(page.ownershipType);
-                    const isSelected = selectedPageId === page.pageId;
-                    const rankVal = rankMap[page.pageId]
-                      ? `#${rankMap[page.pageId]}`
-                      : '--';
+              {/* If no pages */}
+              {myDeploymentsData?.pages?.length === 0 &&
+                !myDeploymentsLoading && (
+                  <p className='text-sm text-gray-300'>
+                    You have not deployed any pages yet.
+                  </p>
+                )}
 
-                    return (
-                      <tr
-                        key={page.id}
-                        className={`cursor-pointer border-b border-gray-700 hover:bg-gray-800 ${
-                          isSelected ? 'bg-gray-800' : ''
-                        }`}
-                        onClick={() => {
-                          setSelectedPageId(page.pageId);
-                        }}
-                      >
-                        <td className='p-2 text-cyan-300'>{page.name}</td>
-                        <td className='p-2'>{page.pageId}</td>
-                        <td className='p-2'>{ownershipStr}</td>
-                        <td className='p-2 text-yellow-400'>{rankVal}</td>
-                        <td className='p-2'>{page.imt ? 'True' : 'False'}</td>
-                        <td className='p-2 text-green-400'>
-                          {safeNum(page.totalLikes)}
-                        </td>
-                        <td className='p-2 text-red-400'>
-                          {safeNum(page.totalDislikes)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              {myDeploymentsData?.pages?.length ? (
+                <table className='w-full border-collapse text-sm text-white'>
+                  <thead>
+                    <tr className='border-neon-pink text-neon-pink border-b'>
+                      <th className='p-2 text-left'>Name</th>
+                      <th className='p-2 text-left'>PageId</th>
+                      <th className='p-2 text-left'>Ownership</th>
+                      <th className='p-2 text-left'>Rank</th>
+                      <th className='p-2 text-left'>Immutable</th>
+                      <th className='p-2 text-left'>Likes</th>
+                      <th className='p-2 text-left'>Dislikes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myDeploymentsData.pages.map((page) => {
+                      const ownershipStr = parseOwnershipType(
+                        page.ownershipType,
+                      );
+                      const isSelected = selectedPageId === page.pageId;
+                      const rankVal = rankMap[page.pageId]
+                        ? `#${rankMap[page.pageId]}`
+                        : '--';
+
+                      return (
+                        <tr
+                          key={page.id}
+                          className={`cursor-pointer border-b border-gray-700 hover:bg-gray-800 ${
+                            isSelected ? 'bg-gray-800' : ''
+                          }`}
+                          onClick={() => {
+                            setSelectedPageId(page.pageId);
+                          }}
+                        >
+                          <td className='p-2 text-cyan-300'>{page.name}</td>
+                          <td className='p-2'>{page.pageId}</td>
+                          <td className='p-2'>{ownershipStr}</td>
+                          <td className='p-2 text-yellow-400'>{rankVal}</td>
+                          <td className='p-2'>{page.imt ? 'True' : 'False'}</td>
+                          <td className='p-2 text-green-400'>
+                            {safeNum(page.totalLikes)}
+                          </td>
+                          <td className='p-2 text-red-400'>
+                            {safeNum(page.totalDislikes)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : null}
             </div>
 
             {/* Right - Requests */}
@@ -558,11 +615,11 @@ export default function Mypage() {
                 </div>
               )}
 
-              {!selectedPageId && (
+              {!selectedPageId && myDeploymentsData?.pages?.length ? (
                 <div className='text-sm text-gray-300'>
                   Select a page to see requests
                 </div>
-              )}
+              ) : null}
 
               {!isImmutableOrPerm && selectedPageId && (
                 <>
@@ -707,9 +764,24 @@ export default function Mypage() {
                   <div className='mt-2 h-[180px] overflow-auto rounded bg-gray-800 p-2 text-xs'>
                     {requestData.newHtml}
                   </div>
-                  <button className='text-md ml-[370px] mt-4 h-[45px] w-[100px] rounded-md bg-gray-700 font-mono font-semibold text-gray-200 hover:bg-gray-600'>
-                    Approve
-                  </button>
+
+                  {/* If Single or MultiSig => can Approve */}
+                  {!isImmutableOrPerm && !requestData.executed && (
+                    <button
+                      className='text-md ml-[370px] mt-4 h-[45px] w-[100px] rounded-md bg-gray-700 font-mono font-semibold text-gray-200 hover:bg-gray-600'
+                      onClick={handleApprove}
+                      disabled={isApproving}
+                    >
+                      {isApproving ? (
+                        <div>
+                          <Spinner />
+                          Approve
+                        </div>
+                      ) : (
+                        'Approve'
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>

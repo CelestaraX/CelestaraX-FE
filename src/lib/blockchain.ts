@@ -1,4 +1,5 @@
 // lib/blockchain.ts
+
 import { ethers } from 'ethers';
 
 /**
@@ -17,8 +18,8 @@ if (!CONTRACT_ADDRESS) {
 }
 
 /**
- * Contract ABI for reading HTML and update requests
- * You can add more if needed (vote, requestUpdate, etc.)
+ * Contract ABI for reading HTML, update requests,
+ * and now an "approveRequest" function for Single/MultiSig.
  */
 const CONTRACT_ABI = [
   {
@@ -44,6 +45,18 @@ const CONTRACT_ABI = [
       { name: 'approvalCount', type: 'uint256' },
     ],
     stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    // Added for approving an update request
+    constant: false,
+    inputs: [
+      { name: '_pageId', type: 'uint256' },
+      { name: '_requestId', type: 'uint256' },
+    ],
+    name: 'approveRequest',
+    outputs: [],
+    stateMutability: 'nonpayable',
     type: 'function',
   },
 ];
@@ -103,10 +116,10 @@ export async function fetchUpdateRequestFromContract(
     );
     const [newName, newThumbnail, newHtml, executed, approvalCount] =
       await contract.getUpdateRequest(pageId, requestId);
+
     console.log(
       `Success: Update request #${requestId} for pageId=${pageId} fetched.`,
     );
-
     return {
       newName,
       newThumbnail,
@@ -121,4 +134,34 @@ export async function fetchUpdateRequestFromContract(
     );
     return null;
   }
+}
+
+/**
+ * Approve an update request on the contract
+ * Requires wallet interaction (signer)
+ * @param pageId string
+ * @param requestId string
+ * @returns transaction receipt or error
+ */
+export async function approveUpdateRequestOnContract(
+  pageId: string,
+  requestId: string,
+) {
+  if (!window.ethereum) {
+    throw new Error(
+      'No wallet provider found. Please install MetaMask or similar.',
+    );
+  }
+
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+
+  const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+  console.log(`Approving request #${requestId} for pageId=${pageId}...`);
+  const tx = await contract.approveRequest(pageId, requestId);
+  console.log('approveRequest TX broadcasted:', tx.hash);
+
+  const receipt = await tx.wait(1); // wait 1 confirmation
+  console.log('approveRequest TX confirmed:', receipt.transactionHash);
+  return receipt;
 }
