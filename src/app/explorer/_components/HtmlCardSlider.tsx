@@ -1,5 +1,4 @@
 'use client';
-
 import React, {
   useState,
   useEffect,
@@ -31,10 +30,11 @@ import { mammothon } from '@/wagmi';
 
 import { GET_PAGE_CREATEDS } from '@/lib/graphql/queries';
 import { PageCreated } from '@/types';
-import { config } from '@/wagmi'; // Your global wagmi config
+import { config } from '@/wagmi'; // your global wagmi config
 
 import { JsonRpcProvider, Contract } from 'ethers';
 import Image from 'next/image';
+import { useMediaQuery } from 'usehooks-ts';
 
 /**
  * ABI for the "vote" function
@@ -84,7 +84,7 @@ const FETCH_CONTRACT_ABI = [
 ];
 
 /**
- * Small spinner component (adding neon style)
+ * A small spinner component for pending states
  */
 function Spinner() {
   return (
@@ -112,7 +112,7 @@ function Spinner() {
 }
 
 /**
- * Fetch HTML content from chain
+ * Fetch HTML content for a given pageId from the on-chain contract
  */
 export async function fetchPageDataFromContract(
   pageId: string,
@@ -136,33 +136,36 @@ export async function fetchPageDataFromContract(
 }
 
 /**
- * Main Explorer page component
+ * Main component to display and interact with pages
  */
 export default function HtmlCardSlider() {
+  // Query subgraph for pages
   const { data, loading, error, refetch } = useQuery<{ pages: PageCreated[] }>(
     GET_PAGE_CREATEDS,
   );
 
-  // Swiper & index
+  // Swiper reference & active index
   const [swiperRef, setSwiperRef] = useState<SwiperClass | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Blockchain HTML
+  // Fetched HTML from chain
   const [blockchainHtml, setBlockchainHtml] = useState('<p>Loading...</p>');
 
-  // Search filter
+  // Search input state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Drawer state
+  // Drawer (side panel) state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 640px)');
 
-  // Wallet
+  // Wallet status & connect modal
   const { isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
 
-  // Filter pages from subgraph
+  // Data from subgraph
   const allPages = useMemo(() => data?.pages || [], [data]);
 
+  // Filtered & sorted pages based on search
   const filteredPages = useMemo(() => {
     return allPages
       .filter((page) =>
@@ -176,21 +179,21 @@ export default function HtmlCardSlider() {
   }, [searchQuery, allPages]);
 
   /**
-   * Local store for like/dislike counts.
+   * Local store for like/dislike counts to avoid waiting for subgraph updates
    */
   const [localVotes, setLocalVotes] = useState<{
     [pageId: string]: { totalLikes: number; totalDislikes: number };
   }>({});
 
   /**
-   * Track the user's personal vote (like or dislike)
+   * Track user votes (like or dislike) for instant UI feedback
    */
   const [userVotes, setUserVotes] = useState<{
     [pageId: string]: boolean | null;
   }>({});
 
   /**
-   * On subgraph data update, parse totalLikes/totalDislikes as number
+   * Update localVotes whenever our filteredPages changes
    */
   useEffect(() => {
     if (filteredPages.length > 0) {
@@ -207,28 +210,26 @@ export default function HtmlCardSlider() {
     }
   }, [filteredPages]);
 
-  // For spinner
+  // Transaction states
   const [isTxAwaitingConfirmation, setIsTxAwaitingConfirmation] =
     useState(false);
-
-  // Pending tx
   const [pendingTxPageId, setPendingTxPageId] = useState<string | null>(null);
   const [pendingTxIsLike, setPendingTxIsLike] = useState<boolean | null>(null);
 
-  // Wagmi contract write
+  // Wagmi write contract
   const { data: txData, writeContract } = useWriteContract({ config });
 
-  // Navigation checks
+  // Check Swiper navigation
   const canPrev = activeIndex > 0;
   const canNext = activeIndex < filteredPages.length - 1;
 
   /**
-   * handleVote
+   * handleVote function for Like / Dislike
    */
   const handleVote = useCallback(
     async (pageId: string, isLike: boolean) => {
       if (!isConnected) {
-        // If not connected, open wallet modal
+        // If wallet not connected, open modal
         if (openConnectModal) {
           openConnectModal();
         } else {
@@ -242,13 +243,13 @@ export default function HtmlCardSlider() {
         setPendingTxPageId(pageId);
         setPendingTxIsLike(isLike);
 
-        // Immediately set user vote so button color changes
+        // Optimistic update: set user vote immediately
         setUserVotes((prev) => ({
           ...prev,
           [pageId]: isLike,
         }));
 
-        // Simulate
+        // Simulate transaction
         const result = await simulateContract(config, {
           chainId: mammothon.id,
           address: VOTE_CONTRACT_ADDRESS,
@@ -257,7 +258,7 @@ export default function HtmlCardSlider() {
           args: [parseInt(pageId, 10), isLike],
         });
 
-        // Send TX
+        // Send transaction
         writeContract(
           {
             ...result.request,
@@ -265,10 +266,11 @@ export default function HtmlCardSlider() {
           {
             onError: (err) => {
               console.error('Transaction error:', err);
-              // Reset states
+              // Reset states if error
               setIsTxAwaitingConfirmation(false);
               setPendingTxPageId(null);
               setPendingTxIsLike(null);
+              // Reset user vote
               setUserVotes((prev) => ({
                 ...prev,
                 [pageId]: null,
@@ -284,6 +286,7 @@ export default function HtmlCardSlider() {
         setIsTxAwaitingConfirmation(false);
         setPendingTxPageId(null);
         setPendingTxIsLike(null);
+        // Reset user vote
         setUserVotes((prev) => ({
           ...prev,
           [pageId]: null,
@@ -294,7 +297,8 @@ export default function HtmlCardSlider() {
   );
 
   /**
-   * Wait for confirmation => update local state or refetch
+   * After transaction is sent, wait for confirmation
+   * then update local state or refetch subgraph
    */
   useEffect(() => {
     if (!txData) return;
@@ -329,10 +333,10 @@ export default function HtmlCardSlider() {
             });
           }
 
-          // Refetch subgraph
+          // Refetch subgraph to sync data
           refetch();
 
-          // Reset
+          // Reset pending states
           setIsTxAwaitingConfirmation(false);
           setPendingTxPageId(null);
           setPendingTxIsLike(null);
@@ -354,22 +358,24 @@ export default function HtmlCardSlider() {
   }, [txData, pendingTxPageId, pendingTxIsLike, refetch]);
 
   /**
-   * Fetch HTML from chain when activeIndex changes
+   * Fetch HTML from contract whenever activeIndex changes
    */
   useEffect(() => {
     if (filteredPages.length === 0) {
       setBlockchainHtml('<p>No pages available</p>');
       return;
     }
+
     const page = filteredPages[activeIndex];
     if (!page) {
       setBlockchainHtml('<p>Invalid page</p>');
       return;
     }
+
     fetchPageDataFromContract(page.pageId).then(setBlockchainHtml);
   }, [filteredPages, activeIndex]);
 
-  // Subgraph load states
+  // Handle subgraph load states
   if (loading) {
     return <div className='text-white'>Loading from subgraph...</div>;
   }
@@ -385,11 +391,11 @@ export default function HtmlCardSlider() {
     }
   };
 
-  // Current page
+  // Current page based on activeIndex
   const currentPage = filteredPages[activeIndex] || null;
 
   /**
-   * Helper: check spinner state for a button
+   * Check if a like/dislike button should show spinner
    */
   const shouldShowSpinner = (pageId: string, isLikeButton: boolean) => {
     return (
@@ -400,156 +406,168 @@ export default function HtmlCardSlider() {
   };
 
   return (
-    <div className='text-neon-pink relative flex h-full w-full flex-col items-center justify-center gap-10'>
-      {/** Search input */}
-      <div className='relative w-80'>
-        <Search
-          className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
-          size={18}
-        />
-        <input
-          type='text'
-          placeholder='Search by pageId...'
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className='focus:ring-neon-pink w-full rounded-xl bg-[#1c1c1e] px-10 py-2 text-gray-300 placeholder-gray-500 outline-none focus:ring-2'
-        />
-      </div>
-
-      {/** Drawer button */}
-      <motion.button
-        className='flex items-center gap-1 rounded-md bg-gray-700 px-4 py-2 text-white shadow-[0_0_8px_rgba(255,0,255,0.3)] hover:bg-gray-500'
-        whileTap={{ scale: 0.9 }}
-        onClick={toggleDrawer}
-      >
-        <Search size={20} />
-        <span>Show Details</span>
-      </motion.button>
-
-      {/** Swiper nav */}
-      <div className='flex w-full max-w-[1600px] items-center justify-between px-4'>
+    <div className='text-neon-pink relative flex h-full max-h-[1200px] w-full max-w-[1600px] flex-col items-center justify-center gap-20 sm:flex-row'>
+      {/* Left arrow */}
+      <div>
         <motion.button
           disabled={!canPrev}
-          className={`rounded-full p-3 text-white transition ${
+          className={`rounded-full p-1 text-white transition sm:p-3 ${
             canPrev
-              ? 'border-neon-pink border bg-black hover:shadow-[0_0_10px_rgba(255,0,255,0.4)]'
+              ? 'border-neon-pink hover:shadow-[0_0_10px_hsla(300, 100%, 50%, 0.4)] border bg-black'
               : 'cursor-not-allowed bg-gray-500/50'
           }`}
           whileHover={canPrev ? { scale: 1.2 } : {}}
           whileTap={canPrev ? { scale: 0.9 } : {}}
           onClick={() => canPrev && swiperRef?.slidePrev()}
         >
-          <ChevronLeft size={36} />
-        </motion.button>
-
-        <Swiper
-          spaceBetween={10}
-          slidesPerView={1}
-          onSwiper={(swiper) => setSwiperRef(swiper)}
-          onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
-          modules={[Navigation]}
-          className='border-neon-pink h-[800px] w-[1300px] border bg-black/20 shadow-[0_0_15px_rgba(255,0,255,0.2)]'
-        >
-          {filteredPages.map((page) => (
-            <SwiperSlide key={page.id}>
-              <motion.div
-                className='border-neon-pink flex h-full flex-col border-b bg-black bg-opacity-40 p-3 shadow-inner'
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <h2 className='text-neon-pink mb-3 text-center text-lg font-bold'>
-                  {page.name}
-                </h2>
-                {currentPage && currentPage.pageId === page.pageId ? (
-                  <iframe
-                    srcDoc={blockchainHtml}
-                    className='border-neon-pink h-full w-full flex-1 border bg-gray-900'
-                    sandbox='allow-scripts allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox'
-                  />
-                ) : (
-                  <div className='flex flex-1 items-center justify-center text-gray-500'>
-                    Rendering data...
-                  </div>
-                )}
-              </motion.div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
-
-        <motion.button
-          disabled={!canNext}
-          className={`rounded-full p-3 text-white transition ${
-            canNext
-              ? 'border-neon-pink border bg-black hover:shadow-[0_0_10px_rgba(255,0,255,0.4)]'
-              : 'cursor-not-allowed bg-gray-500/50'
-          }`}
-          whileHover={canNext ? { scale: 1.2 } : {}}
-          whileTap={canNext ? { scale: 0.9 } : {}}
-          onClick={() => canNext && swiperRef?.slideNext()}
-        >
-          <ChevronRight size={36} />
+          <ChevronLeft
+            size={isMobile ? 20 : 36}
+            className='rotate-90 sm:rotate-0'
+          />
         </motion.button>
       </div>
-
-      {/** Like/Dislike section */}
-      {currentPage && (
-        <div className='flex items-center gap-5'>
-          <motion.button
-            className={`flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-white transition hover:shadow-[0_0_10px_rgba(255,255,255,0.3)] ${
-              userVotes[currentPage.pageId] === true
-                ? 'border-green-500 bg-green-600'
-                : 'bg-gray-600'
-            } ${
-              shouldShowSpinner(currentPage.pageId, true)
-                ? 'pointer-events-none opacity-70'
-                : ''
-            }`}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => handleVote(currentPage.pageId, true)}
-          >
-            {shouldShowSpinner(currentPage.pageId, true) ? (
-              <Spinner />
-            ) : (
-              <ThumbsUp size={20} />
-            )}
-            <span className='font-semibold'>
-              Like (
-              {localVotes[currentPage.pageId]?.totalLikes ??
-                (Number(currentPage.totalLikes) || 0)}
-              )
-            </span>
-          </motion.button>
-
-          <motion.button
-            className={`flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-white transition hover:shadow-[0_0_10px_rgba(255,255,255,0.3)] ${
-              userVotes[currentPage.pageId] === false
-                ? 'border-red-500 bg-red-600'
-                : 'bg-gray-600'
-            } ${
-              shouldShowSpinner(currentPage.pageId, false)
-                ? 'pointer-events-none opacity-70'
-                : ''
-            }`}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => handleVote(currentPage.pageId, false)}
-          >
-            {shouldShowSpinner(currentPage.pageId, false) ? (
-              <Spinner />
-            ) : (
-              <ThumbsDown size={20} />
-            )}
-            <span className='font-semibold'>
-              Dislike (
-              {localVotes[currentPage.pageId]?.totalDislikes ??
-                (Number(currentPage.totalDislikes) || 0)}
-              )
-            </span>
-          </motion.button>
+      {/* 
+        Top bar with search & details button. 
+        - For mobile (sm breakpoint), the text is hidden for the "Show Details" button.
+        - For larger screens, the text is visible.
+      */}
+      <div className='flex h-[50%] w-[80%] flex-col items-center justify-center gap-4 sm:h-[90%]'>
+        <div className='flex w-full justify-between gap-5'>
+          {/* Search input container */}
+          <div className='relative w-full sm:w-auto'>
+            <Search
+              className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'
+              size={18}
+            />
+            <input
+              type='text'
+              placeholder='Search by pageId...'
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className='focus:ring-neon-pink sm:text-md w-full rounded-xl bg-[#1c1c1e] px-10 py-2 text-xs text-gray-300 placeholder-gray-500 outline-none focus:ring-2 sm:w-72 md:w-80'
+            />
+          </div>
+          {/* "Show Details" button 
+            - Only icon on mobile
+            - Icon + text on sm+ 
+        */}
+          <div>
+            <motion.button
+              className='flex items-center justify-center self-end rounded-md bg-gray-700 px-3 py-2 text-white shadow-[0_0_8px_rgba(255,0,255,0.3)] hover:bg-gray-500 sm:self-auto'
+              whileTap={{ scale: 0.9 }}
+              onClick={toggleDrawer}
+            >
+              {/* Icon always visible */}
+              <Search size={20} className='block' />
+              {/* Text hidden on xs, shown on sm+ */}
+              <span className='ml-1 hidden sm:inline'>Show Details</span>
+            </motion.button>
+          </div>
         </div>
-      )}
 
-      {/** Drawer */}
+        {/* Swiper navigation */}
+        <div className='h-full w-full'>
+          {/* Swiper slides 
+            - On mobile: smaller container
+            - On tablet/desktop: bigger container
+        */}
+          <Swiper
+            direction={isMobile ? 'vertical' : 'horizontal'}
+            spaceBetween={10}
+            slidesPerView={1}
+            onSwiper={(swiper) => setSwiperRef(swiper)}
+            onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
+            modules={[Navigation]}
+            className='border-neon-pink h-full w-full border bg-black/20 shadow-[0_0_15px_rgba(255,0,255,0.2)]'
+          >
+            {filteredPages.map((page) => (
+              <SwiperSlide key={page.id}>
+                <motion.div
+                  className='border-neon-pink z-10 flex h-full w-full flex-col border-b bg-black bg-opacity-40 shadow-inner'
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  {/* <h2 className='text-neon-pink z-100 absolute top-[-10px] mb-3 text-center text-lg font-bold'>
+                    {page.name}
+                  </h2> */}
+                  <div className='relative h-full w-full'>
+                    {currentPage && currentPage.pageId === page.pageId ? (
+                      <iframe
+                        srcDoc={blockchainHtml}
+                        className='border-neon-pink absolute left-1/2 top-1/2 h-[1000px] w-[1400px] -translate-x-1/2 -translate-y-1/2 scale-[0.15] border bg-gray-900 sm:scale-[0.6]'
+                        sandbox='allow-scripts allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox'
+                      />
+                    ) : (
+                      <div className='flex h-full items-center justify-center text-gray-500'>
+                        Rendering data...
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </div>
+        {/* Like/Dislike section */}
+        {currentPage && (
+          <div className='flex items-center justify-center gap-5 pt-3'>
+            <motion.button
+              className={`flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-white transition hover:shadow-[0_0_10px_rgba(255,255,255,0.3)] ${
+                userVotes[currentPage.pageId] === true
+                  ? 'border-green-500 bg-green-600'
+                  : 'bg-gray-600'
+              } ${
+                shouldShowSpinner(currentPage.pageId, true)
+                  ? 'pointer-events-none opacity-70'
+                  : ''
+              }`}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => handleVote(currentPage.pageId, true)}
+            >
+              {shouldShowSpinner(currentPage.pageId, true) ? (
+                <Spinner />
+              ) : (
+                <ThumbsUp size={20} />
+              )}
+              <span className='sm:text-md text-sm font-semibold'>
+                Like (
+                {localVotes[currentPage.pageId]?.totalLikes ??
+                  (Number(currentPage.totalLikes) || 0)}
+                )
+              </span>
+            </motion.button>
+
+            <motion.button
+              className={`flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-white transition hover:shadow-[0_0_10px_rgba(255,255,255,0.3)] ${
+                userVotes[currentPage.pageId] === false
+                  ? 'border-red-500 bg-red-600'
+                  : 'bg-gray-600'
+              } ${
+                shouldShowSpinner(currentPage.pageId, false)
+                  ? 'pointer-events-none opacity-70'
+                  : ''
+              }`}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => handleVote(currentPage.pageId, false)}
+            >
+              {shouldShowSpinner(currentPage.pageId, false) ? (
+                <Spinner />
+              ) : (
+                <ThumbsDown size={20} />
+              )}
+              <span className='sm:text-md text-sm font-semibold'>
+                Dislike (
+                {localVotes[currentPage.pageId]?.totalDislikes ??
+                  (Number(currentPage.totalDislikes) || 0)}
+                )
+              </span>
+            </motion.button>
+          </div>
+        )}
+      </div>
+
+      {/* Drawer - side panel for details */}
       <AnimatePresence>
         {isDrawerOpen && currentPage && (
           <div
@@ -558,7 +576,7 @@ export default function HtmlCardSlider() {
             onClick={handleOverlayClick}
           >
             <motion.div
-              className='border-neon-pink relative h-full w-[550px] border-l-4 bg-zinc-900 p-6 text-white shadow-[0_0_15px_rgba(255,0,255,0.3)]'
+              className='border-neon-pink relative h-full w-[90%] max-w-[550px] border-l-4 bg-zinc-900 p-6 text-white shadow-[0_0_15px_rgba(255,0,255,0.3)]'
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
@@ -658,6 +676,25 @@ export default function HtmlCardSlider() {
           </div>
         )}
       </AnimatePresence>
+      <div>
+        {/* Right arrow */}
+        <motion.button
+          disabled={!canNext}
+          className={`rounded-full p-1 text-white transition sm:p-3 ${
+            canNext
+              ? 'border-neon-pink border bg-black hover:shadow-[0_0_10px_rgba(255,0,255,0.4)]'
+              : 'cursor-not-allowed bg-gray-500/50'
+          }`}
+          whileHover={canNext ? { scale: 1.2 } : {}}
+          whileTap={canNext ? { scale: 0.9 } : {}}
+          onClick={() => canNext && swiperRef?.slideNext()}
+        >
+          <ChevronRight
+            size={isMobile ? 20 : 36}
+            className='rotate-90 sm:rotate-0'
+          />
+        </motion.button>
+      </div>
     </div>
   );
 }

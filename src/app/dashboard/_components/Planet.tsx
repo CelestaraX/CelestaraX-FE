@@ -25,7 +25,6 @@ export function Planet({
     }
   });
 
-  // 다양한 형상을 가진 행성들
   const geometriesType = [
     new THREE.SphereGeometry(planetSize, 64, 64),
     new THREE.DodecahedronGeometry(planetSize),

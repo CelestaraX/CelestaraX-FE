@@ -8,7 +8,7 @@ export default function ExplorerPage() {
   return (
     <div>
       <Header />
-      <main className='flex h-[calc(100vh-100px)]'>
+      <main className='flex h-[calc(100vh-100px)] justify-center'>
         <HtmlCardSlider />
       </main>
     </div>
