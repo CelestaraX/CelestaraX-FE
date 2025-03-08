@@ -677,427 +677,436 @@ export default function DeployPage() {
   return (
     <div>
       <Header />
-      <main className='flex h-[calc(100vh-100px)] items-center justify-center'>
-        {/* Left: Form Section */}
-        <div className='flex w-full flex-col gap-10 space-y-6 pl-[100px] md:w-1/2'>
-          <div className='flex flex-col gap-5 font-mono'>
-            <h1 className='text-3xl font-bold text-white'>
-              Deploy Your Own Planet
-            </h1>
-            <div>Deploy your own page to Celestia.</div>
-          </div>
-
-          <div className='flex flex-col gap-7' ref={dropdownRef}>
-            {/* 1) Name */}
-            <div className='relative flex flex-col gap-2'>
-              <label className='text-sm text-cyan-300'>Name</label>
-              <input
-                type='text'
-                placeholder='Enter name'
-                className='w-full rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none focus:ring-2 focus:ring-gray-600'
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                onBlur={() => handleFieldBlur('name')}
-              />
-              {shouldShowError('name') && errors.name && (
-                <p className='text-sm text-red-500'>{errors.name as string}</p>
-              )}
-            </div>
-
-            {/* 2) Immutable */}
-            <div className='relative flex flex-col gap-2'>
-              <label className='text-sm text-cyan-300'>Immutable</label>
-              <div className='relative'>
-                <div
-                  className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300'
-                  onClick={() => handleDropdownToggle('immutable')}
-                  onBlur={() => handleFieldBlur('immutable')}
-                  tabIndex={0}
-                >
-                  {formData.immutable || 'Select immutable option'}
-                </div>
-                <div
-                  className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 transition-transform duration-200 ${
-                    isOpen.immutable ? 'rotate-180' : ''
-                  }`}
-                >
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    className='h-4 w-4 text-gray-400'
-                    viewBox='0 0 20 20'
-                    fill='currentColor'
-                  >
-                    <path
-                      fillRule='evenodd'
-                      d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'
-                      clipRule='evenodd'
-                    />
-                  </svg>
-                </div>
-                {isOpen.immutable && (
-                  <div className='absolute left-0 top-full z-10 mt-2 w-full rounded-xl border border-gray-700 bg-[#1c1c1e] shadow-lg'>
-                    {['True', 'False'].map((opt) => (
-                      <div
-                        key={opt}
-                        className='cursor-pointer px-4 py-2 text-gray-300 hover:bg-gray-700'
-                        onClick={() => {
-                          handleInputChange('immutable', opt);
-                          setTimeout(
-                            () => handleDropdownToggle('immutable'),
-                            100,
-                          );
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {shouldShowError('immutable') && errors.immutable && (
-                <p className='text-sm text-red-500'>
-                  {errors.immutable as string}
-                </p>
-              )}
-            </div>
-
-            {/* 3) Ownership */}
-            <div className='relative flex flex-col gap-2'>
-              <label className='text-sm text-cyan-300'>Ownership</label>
-              <div className='relative'>
-                <div
-                  className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300'
-                  onClick={() => handleDropdownToggle('ownership')}
-                  onBlur={() => handleFieldBlur('ownership')}
-                  tabIndex={0}
-                >
-                  {formData.ownership || 'Select ownership'}
-                </div>
-                <div
-                  className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 transition-transform duration-200 ${
-                    isOpen.ownership ? 'rotate-180' : ''
-                  }`}
-                >
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    className='h-4 w-4 text-gray-400'
-                    viewBox='0 0 20 20'
-                    fill='currentColor'
-                  >
-                    <path
-                      fillRule='evenodd'
-                      d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'
-                      clipRule='evenodd'
-                    />
-                  </svg>
-                </div>
-                {isOpen.ownership && (
-                  <div className='absolute left-0 top-full z-10 mt-2 w-full rounded-xl border border-gray-700 bg-[#1c1c1e] shadow-lg'>
-                    {['Single', 'MultiSig', 'Permissionless'].map((opt) => (
-                      <div
-                        key={opt}
-                        className='cursor-pointer px-4 py-2 text-gray-300 hover:bg-gray-700'
-                        onClick={() => {
-                          handleInputChange('ownership', opt);
-                          setTimeout(
-                            () => handleDropdownToggle('ownership'),
-                            100,
-                          );
-                        }}
-                      >
-                        {opt}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {shouldShowError('ownership') && errors.ownership && (
-                <p className='text-sm text-red-500'>
-                  {errors.ownership as string}
-                </p>
-              )}
-            </div>
-
-            {/* If Single/Permissionless => singleAddress */}
-            {(formData.ownership === 'Single' ||
-              formData.ownership === 'Permissionless') && (
+      <main className='flex h-[calc(100vh-100px)] flex-col justify-center gap-5 overflow-hidden sm:gap-10'>
+        <div className='flex flex-col gap-3 text-center font-mono lg:gap-5'>
+          <h1 className='font-bold text-white lg:text-3xl'>
+            Deploy Your Own Planet
+          </h1>
+          <div className='text-sm'>Deploy your own page to Celestia.</div>
+        </div>
+        <div className='flex h-full flex-col-reverse items-center justify-end lg:flex-row'>
+          {/* Left: Form Section */}
+          <div className='mt-5 flex h-[30vh] w-full justify-center gap-8 overflow-y-auto sm:mt-10 lg:h-[70vh] lg:w-1/2 lg:items-center lg:gap-10 lg:space-y-6 lg:overflow-y-auto lg:pl-[100px]'>
+            <div
+              className='flex h-full flex-col gap-5 sm:w-1/2 lg:w-full lg:gap-7'
+              ref={dropdownRef}
+            >
+              {/* 1) Name */}
               <div className='relative flex flex-col gap-2'>
-                <label className='text-sm text-cyan-300'>Owner Address</label>
+                <label className='text-sm text-cyan-300'>Name</label>
                 <input
                   type='text'
-                  placeholder='Enter owner address'
+                  placeholder='Enter name'
                   className='w-full rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none focus:ring-2 focus:ring-gray-600'
-                  value={formData.singleAddress}
-                  onChange={(e) =>
-                    handleInputChange('singleAddress', e.target.value)
-                  }
-                  onBlur={() => handleFieldBlur('singleAddress')}
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  onBlur={() => handleFieldBlur('name')}
                 />
-                {shouldShowError('singleAddress') && errors.singleAddress && (
+                {shouldShowError('name') && errors.name && (
                   <p className='text-sm text-red-500'>
-                    {errors.singleAddress as string}
+                    {errors.name as string}
                   </p>
                 )}
               </div>
-            )}
 
-            {/* If MultiSig => addresses + threshold */}
-            {formData.ownership === 'MultiSig' && (
-              <>
-                <div className='relative flex flex-col gap-2'>
-                  <label className='text-sm text-cyan-300'>
-                    Multi-Sig Addresses
-                  </label>
-                  {formData.multiAddresses.map((addr, idx) => (
-                    <div key={idx} className='mb-2 flex items-center space-x-2'>
-                      <input
-                        type='text'
-                        placeholder={`Address #${idx + 1}`}
-                        className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
-                          formData.ownership !== 'MultiSig'
-                            ? 'cursor-not-allowed bg-gray-800 text-gray-500'
-                            : 'bg-[#1c1c1e] text-gray-300'
-                        }`}
-                        value={addr}
-                        onChange={(e) =>
-                          handleMultiAddressChange(idx, e.target.value)
-                        }
-                        onBlur={() => handleMultiAddressBlur(idx)}
-                        disabled={formData.ownership !== 'MultiSig'}
-                      />
-                      <X
-                        className='cursor-pointer text-gray-400'
-                        size={18}
-                        onClick={() => removeMultiAddress(idx)}
-                      />
-                    </div>
-                  ))}
-                  <button
-                    type='button'
-                    className='w-full rounded-md bg-cyan-700 px-4 py-2 text-sm text-white hover:bg-cyan-800'
-                    onClick={addMultiAddress}
-                    disabled={formData.ownership !== 'MultiSig'}
+              {/* 2) Immutable */}
+              <div className='relative flex flex-col gap-2'>
+                <label className='text-sm text-cyan-300'>Immutable</label>
+                <div className='relative'>
+                  <div
+                    className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300'
+                    onClick={() => handleDropdownToggle('immutable')}
+                    onBlur={() => handleFieldBlur('immutable')}
+                    tabIndex={0}
                   >
-                    + Add Address
-                  </button>
-                  {Array.isArray(errors.multiAddresses) &&
-                    errors.multiAddresses.map((err, i) => {
-                      if (!err) return null;
-                      if (!shouldShowMultiAddressError(i)) return null;
-                      return (
-                        <p key={i} className='text-sm text-red-500'>
-                          {err}
-                        </p>
-                      );
-                    })}
-                </div>
-
-                <div className='relative flex flex-col gap-2'>
-                  <label className='text-sm text-cyan-300'>
-                    Approval Threshold
-                  </label>
-                  <input
-                    type='number'
-                    placeholder='Enter threshold'
-                    className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
-                      formData.ownership !== 'MultiSig'
-                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
-                        : 'bg-[#1c1c1e] text-gray-300'
+                    {formData.immutable || 'Select immutable option'}
+                  </div>
+                  <div
+                    className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 transition-transform duration-200 ${
+                      isOpen.immutable ? 'rotate-180' : ''
                     }`}
-                    value={formData.multiThreshold}
-                    onChange={(e) =>
-                      handleInputChange('multiThreshold', e.target.value)
-                    }
-                    onBlur={() => handleFieldBlur('multiThreshold')}
-                    disabled={formData.ownership !== 'MultiSig'}
-                  />
-                  {shouldShowError('multiThreshold') &&
-                    errors.multiThreshold && (
-                      <p className='text-sm text-red-500'>
-                        {errors.multiThreshold as string}
-                      </p>
-                    )}
-                </div>
-              </>
-            )}
-
-            {/* 4) Fee */}
-            <div className='relative flex flex-col gap-2'>
-              <label className='text-sm text-cyan-300'>
-                Modification Fee (ETH)
-              </label>
-              <input
-                type='number'
-                placeholder='Enter modification fee'
-                className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
-                  formData.immutable !== 'False' ||
-                  formData.ownership === 'Permissionless'
-                    ? 'cursor-not-allowed bg-gray-800 text-gray-500'
-                    : 'bg-[#1c1c1e] text-gray-300'
-                }`}
-                value={formData.fee}
-                onChange={(e) => handleInputChange('fee', e.target.value)}
-                onBlur={() => handleFieldBlur('fee')}
-                disabled={
-                  formData.immutable !== 'False' ||
-                  formData.ownership === 'Permissionless'
-                }
-              />
-              {shouldShowError('fee') && errors.fee && (
-                <p className='text-sm text-red-500'>{errors.fee as string}</p>
-              )}
-            </div>
-
-            {/* 5) Thumbnail: default or custom */}
-            <div className='relative flex flex-col gap-2'>
-              <label className='text-sm text-cyan-300'>Thumbnail Image</label>
-              <div className='flex items-center space-x-2'>
-                <input
-                  type='checkbox'
-                  checked={useDefaultThumbnail}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setUseDefaultThumbnail(checked);
-                    if (checked) {
-                      // If checked => set default
-                      updateForm({
-                        ...formData,
-                        thumbnail: DEFAULT_THUMBNAIL_URL,
-                      });
-                    } else {
-                      // If unchecked => clear
-                      updateForm({ ...formData, thumbnail: '' });
-                    }
-                  }}
-                />
-                <span className='text-sm text-cyan-300'>
-                  Use Default Thumbnail
-                </span>
-              </div>
-              {!useDefaultThumbnail && (
-                <div className='relative flex items-center space-x-2'>
-                  <input
-                    type='file'
-                    accept='image/png, image/jpeg'
-                    className='hidden'
-                    id='thumbnailFile'
-                    onChange={(e) =>
-                      handleInputChange(
-                        'thumbnail',
-                        e.target.files?.[0] || null,
-                      )
-                    }
-                    onBlur={() => handleFieldBlur('thumbnail')}
-                  />
-                  <label
-                    htmlFor='thumbnailFile'
-                    className={`flex w-[300px] cursor-pointer items-center justify-center rounded-xl ${
-                      formData.thumbnail ? 'bg-gray-800' : 'bg-[#1c1c1e]'
-                    } px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800`}
                   >
-                    <Upload size={18} className='mr-2' />
-                    {formData.thumbnail
-                      ? 'Thumbnail Selected'
-                      : 'Upload Thumbnail'}
-                  </label>
-                  {formData.thumbnail && (
-                    <X
-                      className='cursor-pointer text-gray-400'
-                      size={18}
-                      onClick={() => handleInputChange('thumbnail', null)}
-                    />
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      className='h-4 w-4 text-gray-400'
+                      viewBox='0 0 20 20'
+                      fill='currentColor'
+                    >
+                      <path
+                        fillRule='evenodd'
+                        d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'
+                        clipRule='evenodd'
+                      />
+                    </svg>
+                  </div>
+                  {isOpen.immutable && (
+                    <div className='absolute left-0 top-full z-10 mt-2 w-full rounded-xl border border-gray-700 bg-[#1c1c1e] shadow-lg'>
+                      {['True', 'False'].map((opt) => (
+                        <div
+                          key={opt}
+                          className='cursor-pointer px-4 py-2 text-gray-300 hover:bg-gray-700'
+                          onClick={() => {
+                            handleInputChange('immutable', opt);
+                            setTimeout(
+                              () => handleDropdownToggle('immutable'),
+                              100,
+                            );
+                          }}
+                        >
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {shouldShowError('immutable') && errors.immutable && (
+                  <p className='text-sm text-red-500'>
+                    {errors.immutable as string}
+                  </p>
+                )}
+              </div>
+
+              {/* 3) Ownership */}
+              <div className='relative flex flex-col gap-2'>
+                <label className='text-sm text-cyan-300'>Ownership</label>
+                <div className='relative'>
+                  <div
+                    className='cursor-pointer rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 pr-10 text-gray-300'
+                    onClick={() => handleDropdownToggle('ownership')}
+                    onBlur={() => handleFieldBlur('ownership')}
+                    tabIndex={0}
+                  >
+                    {formData.ownership || 'Select ownership'}
+                  </div>
+                  <div
+                    className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 transition-transform duration-200 ${
+                      isOpen.ownership ? 'rotate-180' : ''
+                    }`}
+                  >
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      className='h-4 w-4 text-gray-400'
+                      viewBox='0 0 20 20'
+                      fill='currentColor'
+                    >
+                      <path
+                        fillRule='evenodd'
+                        d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'
+                        clipRule='evenodd'
+                      />
+                    </svg>
+                  </div>
+                  {isOpen.ownership && (
+                    <div className='absolute left-0 top-full z-10 mt-2 w-full rounded-xl border border-gray-700 bg-[#1c1c1e] shadow-lg'>
+                      {['Single', 'MultiSig', 'Permissionless'].map((opt) => (
+                        <div
+                          key={opt}
+                          className='cursor-pointer px-4 py-2 text-gray-300 hover:bg-gray-700'
+                          onClick={() => {
+                            handleInputChange('ownership', opt);
+                            setTimeout(
+                              () => handleDropdownToggle('ownership'),
+                              100,
+                            );
+                          }}
+                        >
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {shouldShowError('ownership') && errors.ownership && (
+                  <p className='text-sm text-red-500'>
+                    {errors.ownership as string}
+                  </p>
+                )}
+              </div>
+
+              {/* If Single/Permissionless => singleAddress */}
+              {(formData.ownership === 'Single' ||
+                formData.ownership === 'Permissionless') && (
+                <div className='relative flex flex-col gap-2'>
+                  <label className='text-sm text-cyan-300'>Owner Address</label>
+                  <input
+                    type='text'
+                    placeholder='Enter owner address'
+                    className='w-full rounded-xl border border-gray-700 bg-[#1c1c1e] px-4 py-3 text-gray-300 outline-none focus:ring-2 focus:ring-gray-600'
+                    value={formData.singleAddress}
+                    onChange={(e) =>
+                      handleInputChange('singleAddress', e.target.value)
+                    }
+                    onBlur={() => handleFieldBlur('singleAddress')}
+                  />
+                  {shouldShowError('singleAddress') && errors.singleAddress && (
+                    <p className='text-sm text-red-500'>
+                      {errors.singleAddress as string}
+                    </p>
                   )}
                 </div>
               )}
-              {shouldShowError('thumbnail') && errors.thumbnail && (
-                <p className='text-sm text-red-500'>
-                  {errors.thumbnail as string}
-                </p>
-              )}
-            </div>
 
-            {/* 6) HTML File */}
-            <div className='relative flex flex-col gap-2'>
-              <label className='flex items-center gap-1 text-sm text-cyan-300'>
-                <span>HTML File</span>
-                <HelpCircle
-                  size={16}
-                  className='cursor-pointer text-gray-400 hover:text-gray-200'
-                />
-              </label>
-              <div className='relative flex items-center space-x-2'>
-                <input
-                  type='file'
-                  accept='text/html'
-                  className='hidden'
-                  id='htmlFile'
-                  onChange={(e) =>
-                    handleInputChange('htmlFile', e.target.files?.[0] || null)
-                  }
-                  onBlur={() => handleFieldBlur('htmlFile')}
-                />
-                <label
-                  htmlFor='htmlFile'
-                  className={`flex w-[300px] cursor-pointer items-center justify-center rounded-xl ${
-                    formData.htmlFile ? 'bg-gray-800' : 'bg-[#1c1c1e]'
-                  } px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800`}
-                >
-                  <Upload size={18} className='mr-2' />
-                  {formData.htmlFile
-                    ? 'HTML File Selected'
-                    : 'Upload HTML File'}
+              {/* If MultiSig => addresses + threshold */}
+              {formData.ownership === 'MultiSig' && (
+                <>
+                  <div className='relative flex flex-col gap-2'>
+                    <label className='text-sm text-cyan-300'>
+                      Multi-Sig Addresses
+                    </label>
+                    {formData.multiAddresses.map((addr, idx) => (
+                      <div
+                        key={idx}
+                        className='mb-2 flex items-center space-x-2'
+                      >
+                        <input
+                          type='text'
+                          placeholder={`Address #${idx + 1}`}
+                          className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
+                            formData.ownership !== 'MultiSig'
+                              ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                              : 'bg-[#1c1c1e] text-gray-300'
+                          }`}
+                          value={addr}
+                          onChange={(e) =>
+                            handleMultiAddressChange(idx, e.target.value)
+                          }
+                          onBlur={() => handleMultiAddressBlur(idx)}
+                          disabled={formData.ownership !== 'MultiSig'}
+                        />
+                        <X
+                          className='cursor-pointer text-gray-400'
+                          size={18}
+                          onClick={() => removeMultiAddress(idx)}
+                        />
+                      </div>
+                    ))}
+                    <button
+                      type='button'
+                      className='w-full rounded-lg bg-cyan-700 px-4 py-2 text-sm text-white hover:bg-cyan-800'
+                      onClick={addMultiAddress}
+                      disabled={formData.ownership !== 'MultiSig'}
+                    >
+                      + Add Address
+                    </button>
+                    {Array.isArray(errors.multiAddresses) &&
+                      errors.multiAddresses.map((err, i) => {
+                        if (!err) return null;
+                        if (!shouldShowMultiAddressError(i)) return null;
+                        return (
+                          <p key={i} className='text-sm text-red-500'>
+                            {err}
+                          </p>
+                        );
+                      })}
+                  </div>
+
+                  <div className='relative flex flex-col gap-2'>
+                    <label className='text-sm text-cyan-300'>
+                      Approval Threshold
+                    </label>
+                    <input
+                      type='number'
+                      placeholder='Enter threshold'
+                      className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
+                        formData.ownership !== 'MultiSig'
+                          ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                          : 'bg-[#1c1c1e] text-gray-300'
+                      }`}
+                      value={formData.multiThreshold}
+                      onChange={(e) =>
+                        handleInputChange('multiThreshold', e.target.value)
+                      }
+                      onBlur={() => handleFieldBlur('multiThreshold')}
+                      disabled={formData.ownership !== 'MultiSig'}
+                    />
+                    {shouldShowError('multiThreshold') &&
+                      errors.multiThreshold && (
+                        <p className='text-sm text-red-500'>
+                          {errors.multiThreshold as string}
+                        </p>
+                      )}
+                  </div>
+                </>
+              )}
+
+              {/* 4) Fee */}
+              <div className='relative flex flex-col gap-2'>
+                <label className='text-sm text-cyan-300'>
+                  Modification Fee (ETH)
                 </label>
-                {formData.htmlFile && (
-                  <X
-                    className='cursor-pointer text-gray-400'
-                    size={18}
-                    onClick={() => handleInputChange('htmlFile', null)}
-                  />
+                <input
+                  type='number'
+                  placeholder='Enter modification fee'
+                  className={`w-full rounded-xl border border-gray-700 px-4 py-3 outline-none focus:ring-2 focus:ring-gray-600 ${
+                    formData.immutable !== 'False' ||
+                    formData.ownership === 'Permissionless'
+                      ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                      : 'bg-[#1c1c1e] text-gray-300'
+                  }`}
+                  value={formData.fee}
+                  onChange={(e) => handleInputChange('fee', e.target.value)}
+                  onBlur={() => handleFieldBlur('fee')}
+                  disabled={
+                    formData.immutable !== 'False' ||
+                    formData.ownership === 'Permissionless'
+                  }
+                />
+                {shouldShowError('fee') && errors.fee && (
+                  <p className='text-sm text-red-500'>{errors.fee as string}</p>
                 )}
               </div>
-              {shouldShowError('htmlFile') && errors.htmlFile && (
-                <p className='text-sm text-red-500'>
-                  {errors.htmlFile as string}
-                </p>
-              )}
-            </div>
 
-            {/* Deploy button */}
-            <button
-              className='relative w-full rounded-md bg-blue-500 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-600 disabled:bg-gray-500'
-              onClick={handleDeploy}
-              disabled={isDeploying || isPending}
-            >
-              {isDeploying && (
-                <span className='absolute left-5 top-1/2 -translate-y-1/2'>
-                  <Spinner />
+              {/* 5) Thumbnail: default or custom */}
+              <div className='relative flex flex-col gap-2'>
+                <label className='text-sm text-cyan-300'>Thumbnail Image</label>
+                <div className='flex items-center space-x-2'>
+                  <input
+                    type='checkbox'
+                    checked={useDefaultThumbnail}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseDefaultThumbnail(checked);
+                      if (checked) {
+                        // If checked => set default
+                        updateForm({
+                          ...formData,
+                          thumbnail: DEFAULT_THUMBNAIL_URL,
+                        });
+                      } else {
+                        // If unchecked => clear
+                        updateForm({ ...formData, thumbnail: '' });
+                      }
+                    }}
+                  />
+                  <span className='text-sm text-cyan-300'>
+                    Use Default Thumbnail
+                  </span>
+                </div>
+                {!useDefaultThumbnail && (
+                  <div className='relative flex items-center justify-center'>
+                    <input
+                      type='file'
+                      accept='image/png, image/jpeg'
+                      className='hidden'
+                      id='thumbnailFile'
+                      onChange={(e) =>
+                        handleInputChange(
+                          'thumbnail',
+                          e.target.files?.[0] || null,
+                        )
+                      }
+                      onBlur={() => handleFieldBlur('thumbnail')}
+                    />
+                    <label
+                      htmlFor='thumbnailFile'
+                      className={`flex w-[300px] cursor-pointer items-center justify-center rounded-xl ${
+                        formData.thumbnail ? 'bg-gray-800' : 'bg-[#1c1c1e]'
+                      } px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800`}
+                    >
+                      <Upload size={18} className='mr-2' />
+                      {formData.thumbnail
+                        ? 'Thumbnail Selected'
+                        : 'Upload Thumbnail'}
+                    </label>
+                    {formData.thumbnail && (
+                      <X
+                        className='cursor-pointer text-gray-400'
+                        size={18}
+                        onClick={() => handleInputChange('thumbnail', null)}
+                      />
+                    )}
+                  </div>
+                )}
+                {shouldShowError('thumbnail') && errors.thumbnail && (
+                  <p className='text-sm text-red-500'>
+                    {errors.thumbnail as string}
+                  </p>
+                )}
+              </div>
+
+              {/* 6) HTML File */}
+              <div className='relative flex flex-col gap-2'>
+                <label className='flex items-center gap-1 text-sm text-cyan-300'>
+                  <span>HTML File</span>
+                  <HelpCircle
+                    size={16}
+                    className='cursor-pointer text-gray-400 hover:text-gray-200'
+                  />
+                </label>
+                <div className='relative flex items-center justify-center'>
+                  <input
+                    type='file'
+                    accept='text/html'
+                    className='hidden'
+                    id='htmlFile'
+                    onChange={(e) =>
+                      handleInputChange('htmlFile', e.target.files?.[0] || null)
+                    }
+                    onBlur={() => handleFieldBlur('htmlFile')}
+                  />
+                  <label
+                    htmlFor='htmlFile'
+                    className={`flex w-[300px] cursor-pointer items-center justify-center rounded-xl ${
+                      formData.htmlFile ? 'bg-gray-800' : 'bg-[#1c1c1e]'
+                    } px-4 py-3 text-gray-300 outline-none transition-all duration-200 hover:bg-gray-800`}
+                  >
+                    <Upload size={18} className='mr-2' />
+                    {formData.htmlFile
+                      ? 'HTML File Selected'
+                      : 'Upload HTML File'}
+                  </label>
+                  {formData.htmlFile && (
+                    <X
+                      className='cursor-pointer text-gray-400'
+                      size={18}
+                      onClick={() => handleInputChange('htmlFile', null)}
+                    />
+                  )}
+                </div>
+                {shouldShowError('htmlFile') && errors.htmlFile && (
+                  <p className='text-sm text-red-500'>
+                    {errors.htmlFile as string}
+                  </p>
+                )}
+              </div>
+
+              {/* Deploy button */}
+              <button
+                className='relative w-full rounded-lg bg-blue-500 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-600 disabled:bg-gray-500'
+                onClick={handleDeploy}
+                disabled={isDeploying || isPending}
+              >
+                {isDeploying && (
+                  <span className='absolute left-5 top-1/2 -translate-y-1/2'>
+                    <Spinner />
+                  </span>
+                )}
+                <span className={isDeploying ? 'ml-6' : ''}>
+                  {isDeploying ? 'Deploying...' : 'Deploy'}
                 </span>
-              )}
-              <span className={isDeploying ? 'ml-6' : ''}>
-                {isDeploying ? 'Deploying...' : 'Deploy'}
-              </span>
-            </button>
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Right: Planet with progress ring */}
-        <div className='relative flex w-full items-center justify-center md:w-1/2'>
-          <div className='relative h-[500px] w-[500px]'>
-            <CircularProgress progress={isNaN(progress) ? 0 : progress} />
-            <Canvas className='absolute h-full w-full'>
-              <ambientLight intensity={0.5} />
-              <pointLight position={[10, 10, 10]} />
-              <CustomStarsPlanet
-                radius={1 + (progress / 100) * 1.5}
-                starCount={3000}
-                rotationSpeed={0.02}
-                color1='#4A90E2'
-                color2='#F5A623'
-                minSize={0.1}
-                maxSize={0.2}
-                fade
-              />
-            </Canvas>
+          {/* Right: Planet with progress ring */}
+          <div className='flex w-full justify-center lg:w-1/2 lg:pb-20'>
+            <div className='relative h-[230px] w-[230px] sm:h-[300px] sm:w-[300px] md:h-[400px] md:w-[400px] lg:h-[500px] lg:w-[500px]'>
+              <CircularProgress progress={isNaN(progress) ? 0 : progress} />
+              <Canvas className='absolute h-full w-full'>
+                <ambientLight intensity={0.5} />
+                <pointLight position={[10, 10, 10]} />
+                <CustomStarsPlanet
+                  radius={1 + (progress / 100) * 1.5}
+                  starCount={3000}
+                  rotationSpeed={0.02}
+                  color1='#4A90E2'
+                  color2='#F5A623'
+                  minSize={0.1}
+                  maxSize={0.2}
+                  fade
+                />
+              </Canvas>
+            </div>
           </div>
         </div>
       </main>
