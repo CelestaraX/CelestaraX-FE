@@ -686,7 +686,7 @@ export default function DeployPage() {
         </div>
         <div className='flex h-full flex-col-reverse items-center justify-end lg:flex-row'>
           {/* Left: Form Section */}
-          <div className='mt-5 flex h-[30vh] w-full justify-center gap-8 overflow-y-auto sm:mt-10 lg:h-[70vh] lg:w-1/2 lg:items-center lg:gap-10 lg:space-y-6 lg:overflow-y-auto lg:pl-[100px]'>
+          <div className='mt-5 flex h-[30vh] w-full justify-center gap-8 overflow-y-auto sm:mt-10 lg:h-[75vh] lg:w-1/2 lg:items-center lg:gap-10 lg:space-y-6 lg:overflow-y-auto lg:pl-[100px]'>
             <div
               className='flex h-full flex-col gap-5 sm:w-1/2 lg:w-full lg:gap-7'
               ref={dropdownRef}

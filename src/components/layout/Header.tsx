@@ -97,7 +97,7 @@ export default function Header({ onDeployClick }: HeaderProps) {
 
       {/* Mobile Nav (visible only if isMenuOpen, and hidden on md+) */}
       {isMenuOpen && (
-        <nav className='absolute right-0 top-[70px] mt-2 w-full bg-black bg-opacity-80 px-7 py-4 backdrop-blur-md md:hidden'>
+        <nav className='absolute right-0 top-[70px] mt-2 w-full bg-black bg-opacity-80 px-7 py-4 backdrop-blur-md lg:hidden'>
           <ul className='flex flex-col items-center space-y-4 font-mono text-lg'>
             <li>
               <Link
