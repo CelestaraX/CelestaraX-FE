@@ -684,11 +684,11 @@ export default function DeployPage() {
           </h1>
           <div className='text-sm'>Deploy your own page to Celestia.</div>
         </div>
-        <div className='flex h-full flex-col-reverse items-center justify-end lg:flex-row'>
+        <div className='flex h-full flex-col-reverse items-center justify-center lg:flex-row'>
           {/* Left: Form Section */}
           <div className='mt-5 flex h-[30vh] w-full justify-center gap-8 overflow-y-auto sm:mt-10 lg:h-[75vh] lg:w-1/2 lg:items-center lg:gap-10 lg:space-y-6 lg:overflow-y-auto lg:pl-[100px]'>
             <div
-              className='flex h-full flex-col gap-5 sm:w-1/2 lg:w-full lg:gap-7'
+              className='flex h-full flex-col gap-5 sm:w-1/2 lg:w-full lg:justify-center lg:gap-7'
               ref={dropdownRef}
             >
               {/* 1) Name */}
@@ -1089,7 +1089,7 @@ export default function DeployPage() {
           </div>
 
           {/* Right: Planet with progress ring */}
-          <div className='flex w-full justify-center lg:w-1/2 lg:pb-20'>
+          <div className='flex w-full items-center justify-center lg:h-full lg:w-1/2'>
             <div className='relative h-[230px] w-[230px] sm:h-[300px] sm:w-[300px] md:h-[400px] md:w-[400px] lg:h-[500px] lg:w-[500px]'>
               <CircularProgress progress={isNaN(progress) ? 0 : progress} />
               <Canvas className='absolute h-full w-full'>
